@@ -103,6 +103,12 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         {
             put(r, getEnumNum(val).pack[]);
         }
+        else static if (is(T == const(void)[]) || is(T == const(void)[N], size_t N))
+        {
+            static if (isDynamicArray!T)
+                put(r, (cast(length_t)val.length).pack[]);
+            put(r, cast(ubyte[])val[]);
+        }
         else static if (isStaticArray!T)
         {
             foreach (ref v; val)
@@ -116,7 +122,8 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         else static if (isDynamicArray!T)
         {
             put(r, (cast(length_t)val.length).pack[]);
-            foreach (ref v; val) sbinSerialize(r, v);
+            foreach (ref v; val)
+                sbinSerialize(r, v);
         }
         else static if (isAssociativeArray!T)
         {
@@ -222,6 +229,25 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
                 v = pop(r, _field, T.stringof, i, T.sizeof);
             trg = EM[tmp.unpack!ENT];
         }
+        else static if (is(T == void[]) || is(T == void[N], size_t N))
+        {
+            static if (isDynamicArray!T)
+            {
+                length_t l;
+                impl(r, l, ff("length"));
+                if (trg.length != l)
+                    trg.length = l;
+            }
+
+            auto tmp = cast(ubyte[])trg[];
+            foreach (i, ref v; tmp)
+                impl(r, v, fi(i));
+        }
+        else static if (isStaticArray!T)
+        {
+            foreach (i, ref v; trg)
+                impl(r, v, fi(i));
+        }
         else static if (isSomeString!T)
         {
             length_t l;
@@ -229,13 +255,8 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
             auto length = cast(size_t)l;
             auto tmp = new ubyte[](length);
             foreach (i, ref v; tmp)
-                v = pop(r, fi(i), T.stringof, i, length);
+                v = pop(r, fi(i), T.stringof, i, l);
             trg = cast(T)tmp;
-        }
-        else static if (isStaticArray!T)
-        {
-            foreach (i, ref v; trg)
-                impl(r, v, fi(i));
         }
         else static if (isDynamicArray!T)
         {
@@ -699,4 +720,38 @@ unittest
     assert(bar.d == 3);
 
     assert(foo == bar);
+}
+
+unittest
+{
+    struct Foo
+    {
+        ubyte[] a, b;
+    }
+
+    auto arr = cast(ubyte[])[1,2,3,4,5,6];
+    auto foo = Foo(arr, arr[0..2]);
+    assert (foo.a.ptr == foo.b.ptr);
+    
+    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
+    assert(foo == foo2);
+    assert(foo.a.ptr != foo2.a.ptr);
+    assert(foo.b.ptr != foo2.b.ptr);
+    assert(foo2.a.ptr != foo2.b.ptr);
+}
+
+unittest
+{
+    struct Foo { void[] a; }
+    auto foo = Foo("hello".dup);
+    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
+    assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
+}
+
+unittest
+{
+    struct Foo { void[5] a; }
+    auto foo = Foo(cast(void[5])"hello");
+    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
+    assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
 }
