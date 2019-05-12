@@ -127,7 +127,11 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
                 sbinSerialize(r, v);
             }
         }
-        else static if (isTypeTuple!T || is(T == struct))
+        else static if (is(typeof(val.sbinCustomSerialize(r))))
+        {
+            val.sbinCustomSerialize(r);
+        }
+        else static if (is(T == struct))
         {
             foreach (ref v; val.tupleof)
                 sbinSerialize(r, v);
@@ -261,7 +265,11 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
 
             trg.rehash();
         }
-        else static if (isTypeTuple!T || is(T == struct))
+        else static if (is(typeof(T.sbinCustomDeserialize(r, trg))))
+        {
+            T.sbinCustomDeserialize(r, trg);
+        }
+        else static if (is(T == struct))
         {
             foreach (i, ref v; trg.tupleof)
                 impl(r, v, ff(__traits(identifier, trg.tupleof[i])));
@@ -564,12 +572,131 @@ unittest
         ),
     ];
 
-    auto bdata = new ubyte[](1024);
-    auto buffer = Buffer(bdata);
+    ubyte[300] bdata;
+    auto buffer = Buffer(bdata[]);
 
     ubyte[] sdata;
 
     () @nogc { buffer.sbinSerialize(lines); }();
 
     assert(equal(buffer.data.sbinDeserialize!(typeof(lines)), lines));
+}
+
+unittest
+{
+    static bool ser, deser;
+    static struct Foo
+    {
+        ulong id;
+        void sbinCustomSerialize(R)(ref R r) const
+        {
+            r.put(cast(ubyte)id);
+            ser = true;
+        }
+        static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)
+        {
+            foo.id = r.front();
+            r.popFront();
+            deser = true;
+        }
+    }
+
+    auto foo = Foo(12);
+
+    assert(foo.sbinSerialize.sbinDeserialize!Foo == foo);
+    assert(ser);
+    assert(deser);
+}
+
+unittest
+{
+    static bool ser, deser;
+    static class Foo
+    {
+        ulong id;
+        this(ulong v) { id = v; }
+        void sbinCustomSerialize(R)(ref R r) const
+        {
+            r.put(cast(ubyte)id);
+            ser = true;
+        }
+        static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)
+        {
+            foo = new Foo(r.front());
+            r.popFront();
+            deser = true;
+        }
+    }
+
+    auto foo = new Foo(12);
+
+    assert(foo.sbinSerialize.sbinDeserialize!Foo.id == 12);
+    assert(ser);
+    assert(deser);
+
+    Foo[] fooArr;
+    foreach (i; 0 .. 10)
+        fooArr ~= new Foo(i);
+
+    import std.algorithm : map;
+
+    auto fooArr2 = fooArr.sbinSerialize.sbinDeserialize!(Foo[]);
+    assert(equal(fooArr.map!"a.id", fooArr2.map!"a.id"));
+}
+
+unittest
+{
+    // for classes need
+    // void sbinCustomSerialize(R)(ref R r) const
+    // static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)
+    static class Foo
+    {
+        ulong id;
+        this(ulong v) { id = v; }
+    }
+
+    auto foo = new Foo(12);
+
+    static assert(!is(typeof(foo.sbinSerialize.sbinDeserialize!Foo.id)));
+}
+
+unittest
+{
+    import std.bitmanip : bitfields;
+
+    static struct Foo
+    {
+        mixin(bitfields!(
+            bool, "a", 1,
+            bool, "b", 1,
+            ubyte, "c", 4,
+            ubyte, "d", 2
+        ));
+    }
+
+    static assert(Foo.sizeof == 1);
+
+    Foo foo;
+    foo.a = true;
+    foo.b = false;
+    foo.c = 9;
+    foo.d = 3;
+
+    assert(foo.a);
+    assert(foo.b == false);
+    assert(foo.c == 9);
+    assert(foo.d == 3);
+
+    auto sfoo = foo.sbinSerialize;
+
+    assert(sfoo.length == 1);
+
+    auto bar = sfoo.sbinDeserialize!Foo;
+
+    assert(bar.a);
+    assert(bar.b == false);
+    assert(bar.c == 9);
+    assert(bar.d == 3);
+
+    assert(foo == bar);
 }
