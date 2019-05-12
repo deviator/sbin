@@ -1,0 +1,7 @@
+name "sbin"
+description "Simple binary [de]serialize"
+authors "deviator"
+copyright "Copyright © 2019, deviator"
+license "MIT"
+
+targetType "library"
