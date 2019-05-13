@@ -233,6 +233,7 @@ Target sbinDeserialize(Target, R)(R range)
         deserialized value
  +/
 void sbinDeserialize(R, Target...)(R range, ref Target target)
+    if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte))
 {
     size_t cnt;
 
