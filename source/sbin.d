@@ -8,8 +8,11 @@ import std.range;
 import std.string : format;
 import std.traits;
 
-///
-alias length_t = ulong;
+version (sbin_ulong_length) alias length_t = ulong; ///
+else alias length_t = uint; ///
+
+version (unittest)
+    pragma(msg, "sbin type of serialized length: ", length_t);
 
 private alias pack = nativeToLittleEndian;
 
@@ -79,6 +82,39 @@ private template EnumNumType(T) if (is(T == enum))
     alias EnumNumType = Type;
 }
 
+unittest
+{
+    enum Color
+    {
+        black = "#000000",
+        red = "#ff0000",
+        green = "#00ff00",
+        blue = "#0000ff",
+        white = "#ffffff"
+    }
+
+    static assert(is(EnumNumType!Color == ubyte));
+
+    enum Level { low, medium, high }
+
+    static assert(is(EnumNumType!Level == ubyte));
+
+    static string bigElems() pure
+    {
+        import std.format : formattedWrite;
+        auto buf = appender!(char[]);
+        formattedWrite(buf, "enum Big { ");
+        foreach (i; 0 .. 300)
+            formattedWrite(buf, "e%d,", i);
+        buf.put(" }");
+        return buf.data.idup;
+    }
+
+    mixin(bigElems());
+
+    static assert(is(EnumNumType!Big == ushort));
+}
+
 // only for serialize enums based on strings
 private auto getEnumNum(T)(T val) @safe @nogc pure nothrow
     if (is(T == enum))
@@ -102,13 +138,13 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
     {
         alias T = Unqual!(Ts[0]);
         alias val = vals[0];
-        static if (is(T : double) || is(T : long))
-        {
-            put(r, val.pack[]);
-        }
-        else static if (is(T == enum))
+        static if (is(T == enum))
         {
             put(r, getEnumNum(val).pack[]);
+        }
+        else static if (is(T : double) || is(T : long))
+        {
+            put(r, val.pack[]);
         }
         else static if (isVoidArray!T)
         {
@@ -216,16 +252,7 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
         string ff(lazy string n) { return field ~ "." ~ n; }
         string fi(size_t i) { return field ~ format("[%d]", i); }
 
-        static if (is(T : double) || is(T : long))
-        {
-            ubyte[T.sizeof] tmp;
-            version (LDC) auto _field = "<LDC-1.4.0 workaround>";
-            else alias _field = field;
-            foreach (i, ref v; tmp)
-                v = pop(r, _field, T.stringof, i, T.sizeof);
-            trg = tmp.unpack!T;
-        }
-        else static if (is(T == enum))
+        static if (is(T == enum))
         {
             alias ENT = EnumNumType!T;
             enum EM = [EnumMembers!T];
@@ -235,6 +262,15 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
             foreach (i, ref v; tmp)
                 v = pop(r, _field, T.stringof, i, T.sizeof);
             trg = EM[tmp.unpack!ENT];
+        }
+        else static if (is(T : double) || is(T : long))
+        {
+            ubyte[T.sizeof] tmp;
+            version (LDC) auto _field = "<LDC-1.4.0 workaround>";
+            else alias _field = field;
+            foreach (i, ref v; tmp)
+                v = pop(r, _field, T.stringof, i, T.sizeof);
+            trg = tmp.unpack!T;
         }
         else static if (isVoidArray!T)
         {
@@ -259,8 +295,7 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
         {
             length_t l;
             impl(r, l, ff("length"));
-            auto length = cast(size_t)l;
-            auto tmp = new ubyte[](length);
+            auto tmp = new ubyte[](cast(size_t)l);
             foreach (i, ref v; tmp)
                 v = pop(r, fi(i), T.stringof, i, l);
             trg = cast(T)tmp;
@@ -351,47 +386,83 @@ unittest
 
 unittest
 {
-    auto ap = appender!(ubyte[]);
-
-    struct Cell
+    enum Color
     {
-        ulong id;
-        float volt, temp;
-        ushort soc, soh;
-        string strData;
-        bool tr;
+        black = "#000000",
+        red = "#ff0000",
+        green = "#00ff00",
+        blue = "#0000ff",
+        white = "#ffffff"
     }
 
-    struct Line
+    enum Level { low, medium, high }
+
+    struct Foo
     {
-        ulong id;
-        float volt, curr;
-        Cell[] cells;
+        ulong a;
+        float b, c;
+        ushort d;
+        string str;
+        Color color;
+    }
+    
+    const foo1 = Foo(10, 3.14, 2.17, 8, "s1", Color.red);
+
+    //                  a              b         c       d
+    const foo1Size = ulong.sizeof + float.sizeof * 2 + ushort.sizeof +
+    //                      str                      color
+            (length_t.sizeof + foo1.str.length) + ubyte.sizeof;
+
+    // color is ubyte because [EnumMembers!Color].length < ubyte.max
+
+    const foo1Data = foo1.sbinSerialize;
+
+    assert(foo1Data.length == foo1Size);
+    assert(foo1Data.sbinDeserialize!Foo == foo1);
+    
+    const foo2 = Foo(2, 2.22, 2.22, 2, "str2", Color.green);
+
+    const foo2Size = ulong.sizeof + float.sizeof * 2 + ushort.sizeof +
+            (length_t.sizeof + foo2.str.length) + ubyte.sizeof;
+
+    const foo2Data = foo2.sbinSerialize;
+
+    assert(foo2Data.length == foo2Size);
+    assert(foo2Data.sbinDeserialize!Foo == foo2);
+
+    struct Bar
+    {
+        ulong a;
+        float b;
+        Level level;
+        Foo[] foos;
     }
 
-    auto lines = [
-        Line(123,
-            3.14, 2.17,
+    auto bar = Bar(123, 3.14, Level.high, [ foo1, foo2 ]);
+    
+    //                   a               b          level
+    const barSize = ulong.sizeof + float.sizeof + ubyte.sizeof +
+    //                                 foos
+                    (length_t.sizeof + foo1Size + foo2Size);
+    
+    assert(bar.sbinSerialize.length == barSize);
+
+    auto data = [
+        bar,
+        Bar(23,
+            31.4, Level.high,
             [
-                Cell(1, 1.1, 2.2, 5, 8, "one", true),
-                Cell(2, 1.3, 2.5, 7, 9, "two"),
-                Cell(3, 1.5, 2.8, 3, 7, "three"),
-            ]
-        ),
-        Line(23,
-            31.4, 21.7,
-            [
-                Cell(10, .11, .22, 50, 80, "1one1"),
-                Cell(20, .13, .25, 70, 90, "2two2", true),
-                Cell(30, .15, .28, 30, 70, "3three3"),
+                Foo(10, .11, .22, 50, "1one1"),
+                Foo(20, .13, .25, 70, "2two2", Color.black),
+                Foo(30, .15, .28, 30, "3three3", Color.white),
             ]
         ),
     ];
 
-    auto sdata = lines.sbinSerialize;
-    assert( equal(sdata.sbinDeserialize!(Line[]), lines));
-    lines[0].cells[1].soh = 123;
-    assert(!equal(sdata.sbinDeserialize!(Line[]), lines));
+    auto sdata = data.sbinSerialize;
+    assert( equal(sdata.sbinDeserialize!(Bar[]), data));
+    data[0].foos[1].d = 12345;
+    assert(!equal(sdata.sbinDeserialize!(Bar[]), data));
 }
 
 unittest

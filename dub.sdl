@@ -5,3 +5,11 @@ copyright "Copyright © 2019, deviator"
 license "MIT"
 
 targetType "library"
+
+configuration "default" {
+    versions "sbin_default"
+}
+
+configuration "ulong_length" {
+    versions "sbin_ulong_length"
+}
