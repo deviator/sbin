@@ -1,0 +1,18 @@
+sudo: false
+os:
+ - linux
+ - osx
+language: d
+d:
+ - ldc
+ - dmd
+ - ldc-beta
+ - dmd-nightly
+ - ldc-1.15.0
+ - ldc-1.8.0
+ - dmd-2.085.1
+script:
+ - dub test --compiler=${DC} --config=ulong_length
+ - dub test --compiler=${DC} --build=unittest-cov
+after_success:
+ - bash <(curl -s https://codecov.io/bash)
