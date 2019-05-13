@@ -117,6 +117,10 @@ Add to your type:
 
 ## Limitations
 
+### Max dynamic array length
+
+By default uses `uint` as `length_t`, for using `ulong` use library cofiguration `ulong_length`.
+
 ### Code versions
 
 If you want use sbin for message passing between applications you
