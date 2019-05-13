@@ -7,7 +7,6 @@ d:
  - ldc
  - dmd
  - ldc-beta
- - dmd-nightly
  - ldc-1.15.0
  - ldc-1.8.0
  - dmd-2.085.1
