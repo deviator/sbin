@@ -62,6 +62,13 @@ class SBinDeserializeEmptyRangeException : SBinDeserializeException
     }
 }
 
+private bool isVoidArray(T)()
+{
+    static if( (is(T U == U[]) || is(T U == U[N], size_t N)) &&
+                is(Unqual!U == void)) return true;
+    else return false;
+}
+
 private template EnumNumType(T) if (is(T == enum))
 {
     enum EMC = [EnumMembers!T].length;
@@ -103,7 +110,7 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         {
             put(r, getEnumNum(val).pack[]);
         }
-        else static if (is(T == const(void)[]) || is(T == const(void)[N], size_t N))
+        else static if (isVoidArray!T)
         {
             static if (isDynamicArray!T)
                 put(r, (cast(length_t)val.length).pack[]);
@@ -229,7 +236,7 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
                 v = pop(r, _field, T.stringof, i, T.sizeof);
             trg = EM[tmp.unpack!ENT];
         }
-        else static if (is(T == void[]) || is(T == void[N], size_t N))
+        else static if (isVoidArray!T)
         {
             static if (isDynamicArray!T)
             {
@@ -754,4 +761,13 @@ unittest
     auto foo = Foo(cast(void[5])"hello");
     auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
     assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
+}
+
+unittest
+{
+    struct Foo { void[] a; void[5] b; }
+    auto foo = Foo("hello".dup, cast(void[5])"world");
+    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
+    assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
+    assert(equal(cast(ubyte[])foo.b, cast(ubyte[])foo2.b));
 }
