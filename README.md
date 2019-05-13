@@ -1,5 +1,8 @@
 # Simple binary [de]serialize
 
+[![Build Status](https://travis-ci.org/deviator/sbin.svg?branch=master)](https://travis-ci.org/deviator/sbin)
+[![codecov](https://codecov.io/gh/deviator/sbin/branch/master/graph/badge.svg)](https://codecov.io/gh/deviator/sbin)
+
 ## Usage
 
 Library provides functions for simple serialize and deserialize data:
