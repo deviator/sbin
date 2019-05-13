@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/deviator/sbin.svg?branch=master)](https://travis-ci.org/deviator/sbin)
 [![codecov](https://codecov.io/gh/deviator/sbin/branch/master/graph/badge.svg)](https://codecov.io/gh/deviator/sbin)
+[![Dub](https://img.shields.io/dub/v/sbin.svg)](http://code.dlang.org/packages/sbin)
+[![License](https://img.shields.io/dub/l/sbin.svg)](http://code.dlang.org/packages/sbin)
 
 ## Usage
 
