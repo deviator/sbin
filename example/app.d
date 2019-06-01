@@ -3,12 +3,10 @@ import sbin;
 
 struct Foo {
     string name;
-    void bar() {}
 }
 
 union Base {
     int count;
-    int offset;
     string str;
     Foo foo;
 }
@@ -24,108 +22,21 @@ struct Bar
 void barTest()
 {
     auto bar = Bar(4, [TUnion.count(42), TUnion.str("Hello"), TUnion.foo(Foo("ABC"))]);
-    auto sdbar = bar.sbinSerialize.sbinDeserialize!Bar;
+    auto sdbar_data = bar.sbinSerialize;
+    assert (sdbar_data.length == int.sizeof + length_t.sizeof +
+        byte.sizeof + int.sizeof + // count 
+        byte.sizeof + length_t.sizeof + 5 + // str
+        byte.sizeof + length_t.sizeof + 3 // Foo
+    );
+    auto sdbar = sdbar_data.sbinDeserialize!Bar;
 
+    assert (sdbar.someInt == 4);
     assert (sdbar.data.length == 3);
     assert (sdbar.data[0].isCount);
     assert (sdbar.data[0].kind == TUnion.Kind.count);
     assert (sdbar.data[0].value!(TUnion.Kind.count) == 42);
 
-    // be careful
-    assert (bar.data[1].value!(TUnion.Kind.str).ptr ==
-          sdbar.data[1].value!(TUnion.Kind.str).ptr);
-
-    assert (sdbar.data[1].isStr);
-    assert (sdbar.data[1].kind == TUnion.Kind.str);
-    assert (sdbar.data[1].value!(TUnion.Kind.str) == "Hello");
-
-    assert (sdbar.data[2].isFoo);
-    assert (sdbar.data[2].kind == TUnion.Kind.foo);
-    assert (sdbar.data[2].value!(TUnion.Kind.foo) == Foo("ABC"));
-}
-
-struct SBinTaggedUnionWrap(TU)
-{
-    import std.traits : EnumMembers;
-    import std.algorithm.mutation : move;
-
-    TU __tu;
-    alias __tu this;
-
-    void sbinCustomSerialize(R)(ref R r) const
-    {
-        sbinSerialize(r, __tu.kind);
-        F: final switch (__tu.kind)
-        {
-            static foreach (k; EnumMembers!(TU.Kind))
-            {
-                case k:
-                    sbinSerialize(r, __tu.value!k);
-                    break F;
-            }
-        }
-    }
-
-    static void sbinCustomDeserialize(R)(ref R r, ref typeof(this) foo)
-    {
-        TU.Kind kind;
-        sbinDeserializePart(r, kind);
-        F: final switch (kind)
-        {
-            static foreach (k; EnumMembers!(TU.Kind))
-            {
-                case k:
-                    TypeOf!k tmp;
-                    sbinDeserializePart(r, tmp);
-                    foo.__tu.set!k(move(tmp));
-                    break F;
-            }
-        }
-    }
-}
-
-alias TU2 = SBinTaggedUnionWrap!TUnion;
-
-void tu2Test()
-{
-    {
-        auto tu2 = TU2(TUnion.count(42));
-        auto stu2 = tu2.sbinSerialize.sbinDeserialize!TU2;
-        assert (stu2.kind == TUnion.Kind.count);
-        assert (stu2.value!(TUnion.Kind.count) == 42);
-    }
-    {
-        auto tu2 = TU2(TUnion.str("hello"));
-        auto stu2 = tu2.sbinSerialize.sbinDeserialize!TU2;
-        assert (stu2.kind == TUnion.Kind.str);
-        assert (stu2.value!(TUnion.Kind.str) == "hello");
-    }
-    {
-        auto tu2 = TU2(TUnion.offset(2));
-        auto stu2 = tu2.sbinSerialize.sbinDeserialize!TU2;
-        assert (stu2.kind != TUnion.Kind.count);
-        assert (stu2.kind == TUnion.Kind.offset);
-        assert (stu2.value!(TUnion.Kind.offset) == 2);
-    }
-}
-
-struct Bar2
-{
-    int someInt;
-    TU2[] data;
-}
-
-void bar2Test()
-{
-    auto bar = Bar2(4, [TU2(TUnion.count(42)), TU2(TUnion.str("Hello")), TU2(TUnion.foo(Foo("ABC")))]);
-    auto sdbar = bar.sbinSerialize.sbinDeserialize!Bar2;
-
-    assert (sdbar.data.length == 3);
-    assert (sdbar.data[0].isCount);
-    assert (sdbar.data[0].kind == TUnion.Kind.count);
-    assert (sdbar.data[0].value!(TUnion.Kind.count) == 42);
-
-    // be careful
+    // deserialize to new memory
     assert (bar.data[1].value!(TUnion.Kind.str).ptr !=
           sdbar.data[1].value!(TUnion.Kind.str).ptr);
 
@@ -136,11 +47,45 @@ void bar2Test()
     assert (sdbar.data[2].isFoo);
     assert (sdbar.data[2].kind == TUnion.Kind.foo);
     assert (sdbar.data[2].value!(TUnion.Kind.foo) == Foo("ABC"));
+    assert (sdbar.data[2].value!(TUnion.Kind.foo).name.ptr !=
+              bar.data[2].value!(TUnion.Kind.foo).name.ptr);
+}
+
+alias TAlg = TaggedAlgebraic!Base;
+
+struct Bar2 { TAlg[] data; }
+
+void bar2Test()
+{
+    TAlg t_count = 42;
+    TAlg t_str = "Hello";
+    TAlg t_foo = Foo("ABC");
+    auto bar = Bar2([t_count, t_str, t_foo]);
+    auto sdbar_data = bar.sbinSerialize;
+    assert (sdbar_data.length == length_t.sizeof +
+        byte.sizeof + int.sizeof + // count 
+        byte.sizeof + length_t.sizeof + 5 + // str
+        byte.sizeof + length_t.sizeof + 3 // Foo
+    );
+    auto sdbar = sdbar_data.sbinDeserialize!Bar2;
+
+    assert (sdbar.data.length == 3);
+    assert (sdbar.data[0].kind == TAlg.Kind.count);
+    assert (sdbar.data[0] == 42);
+
+    // deserialize to new memory
+    assert (bar.data[1].ptr != sdbar.data[1].ptr);
+
+    assert (sdbar.data[1].kind == TAlg.Kind.str);
+    assert (sdbar.data[1] == "Hello");
+
+    assert (sdbar.data[2].kind == TAlg.Kind.foo);
+    assert (sdbar.data[2] == Foo("ABC"));
+    assert (sdbar.data[2].name.ptr != bar.data[2].name.ptr);
 }
 
 void main()
 {
-    tu2Test();
     barTest();
     bar2Test();
 }

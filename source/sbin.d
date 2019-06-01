@@ -7,6 +7,29 @@ import std.exception : enforce, assertThrown;
 import std.range;
 import std.string : format;
 import std.traits;
+import std.algorithm.mutation : move;
+
+version (Have_taggedalgebraic)
+{
+    import taggedalgebraic;
+
+    template isTaggedUnion(T) {
+        enum isTaggedUnion = is(T == TaggedUnion!X, X);
+    }
+
+    template isTaggedAlgebraic(T) {
+        enum isTaggedAlgebraic = is(T == TaggedAlgebraic!X, X);
+    }
+}
+else
+{
+    template isTaggedUnion(T) {
+        enum isTaggedUnion = false;
+    }
+    template isTaggedAlgebraic(T) {
+        enum isTaggedAlgebraic = false;
+    }
+}
 
 version (sbin_ulong_length) alias length_t = ulong; ///
 else alias length_t = uint; ///
@@ -177,6 +200,19 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
                 sbinSerialize(r, v);
             }
         }
+        else static if (isTaggedUnion!T || isTaggedAlgebraic!T)
+        {
+            sbinSerialize(r, val.kind);
+            FS: final switch (val.kind)
+            {
+                static foreach (k; EnumMembers!(T.Kind))
+                {
+                    case k:
+                        sbinSerialize(r, cast(TypeOf!k)val);
+                        break FS;
+                }
+            }
+        }
         //else static if (is(typeof(val.sbinCustomSerialize(r))))
         else static if (hasMember!(T, "sbinCustomSerialize"))
         {
@@ -345,6 +381,25 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
             }
 
             trg.rehash();
+        }
+        else static if (isTaggedUnion!T || isTaggedAlgebraic!T)
+        {
+            T.Kind kind;
+            impl(r, kind, ff("kind"));
+            FS: final switch (kind)
+            {
+                static foreach (k; EnumMembers!(T.Kind))
+                {
+                    case k:
+                        TypeOf!k tmp;
+                        impl(r, tmp, ff("value"));
+                        static if (isTaggedUnion!T)
+                            trg.set!k(move(tmp));
+                        else
+                            trg = tmp;
+                        break FS;
+                }
+            }
         }
         //else static if (is(typeof(T.sbinCustomDeserialize(r, trg))))
         else static if (hasMember!(T, "sbinCustomDeserialize"))

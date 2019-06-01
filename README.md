@@ -120,21 +120,21 @@ Add to your type:
 * `static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)` where `R`
   is input range, `Foo foo` is new instance for deserialization
 
+### TaggedAlgebraic
+
+See [example](example/app.d).
+
 ## Limitations
 
 ### Unions
 
 Unions serializes/deserializes as static byte array without analyze elements (size of union is size of max element).
 
-**If you want use arrays or strings in unions you must implement custom [de]serialize methods.**
+**If you want use arrays or strings in unions you must implement custom [de]serialize methods or use `TaggedAlgebraic`**
 
 ### std.variant
 
-Library can't work with `std.variant` types because they contains function pointers.
-
-See [example](example) with `TaggedAlgebraic` if you need variablic types.
-Be careful: dynamic arrays, strings are not serialize, serialize only they
-pointers and lengths. See [Unions limitations](#unions).
+Not supported. See [TaggedAlgebraic](#taggedalgebraic) if you need variablic types.
 
 ### Max dynamic array length
 
