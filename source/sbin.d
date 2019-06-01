@@ -177,7 +177,8 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
                 sbinSerialize(r, v);
             }
         }
-        else static if (is(typeof(val.sbinCustomSerialize(r))))
+        //else static if (is(typeof(val.sbinCustomSerialize(r))))
+        else static if (hasMember!(T, "sbinCustomSerialize"))
         {
             val.sbinCustomSerialize(r);
         }
@@ -185,6 +186,10 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         {
             foreach (ref v; val.tupleof)
                 sbinSerialize(r, v);
+        }
+        else static if (is(T == union))
+        {
+            sbinSerialize(r, cast(void[T.sizeof])((cast(void*)&val)[0..T.sizeof]));
         }
         else static assert(0, "unsupported type: " ~ T.stringof);
     }
@@ -223,16 +228,28 @@ Target sbinDeserialize(Target, R)(R range)
     return ret;
 }
 
+/++ Deserialize part of input range to `Target` value
+
+    Params:
+        range = input range with serialized data (not saved before work)
+
+    Returns:
+        deserialized value
+ +/
+Target sbinDeserializePart(Target, R)(ref R range)
+{
+    Unqual!Target ret;
+    sbinDeserializePart(range, ret);
+    return ret;
+}
+
 /++ Deserialize `Target` value
 
     Params:
         range = input range with serialized data (not saved before work)
         target = reference to result object
-
-    Returns:
-        deserialized value
  +/
-void sbinDeserialize(R, Target...)(R range, ref Target target)
+void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
     if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte))
 {
     size_t cnt;
@@ -329,7 +346,8 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
 
             trg.rehash();
         }
-        else static if (is(typeof(T.sbinCustomDeserialize(r, trg))))
+        //else static if (is(typeof(T.sbinCustomDeserialize(r, trg))))
+        else static if (hasMember!(T, "sbinCustomDeserialize"))
         {
             T.sbinCustomDeserialize(r, trg);
         }
@@ -338,6 +356,11 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
             foreach (i, ref v; trg.tupleof)
                 impl(r, v, ff(__traits(identifier, trg.tupleof[i])));
         }
+        else static if (is(T == union))
+        {
+            auto tmp = cast(ubyte[])((cast(void*)&trg)[0..T.sizeof]);
+            foreach (i, ref v; tmp) impl(r, v, fi(i));
+        }
         else static assert(0, "unsupported type: " ~ T.stringof);
     }
 
@@ -345,6 +368,20 @@ void sbinDeserialize(R, Target...)(R range, ref Target target)
         impl(range, target[0], typeof(target[0]).stringof);
     else foreach (ref v; target)
         impl(range, v, typeof(v).stringof);
+}
+
+/++ Deserialize `Target` value
+
+    Params:
+        range = input range with serialized data (not saved before work)
+        target = reference to result object
+
+    Throws:
+        SBinDeserializeException if range isn't empty after deseriazlie
+ +/
+void sbinDeserialize(R, Target...)(R range, ref Target target)
+{
+    sbinDeserializePart(range, target);
 
     enforce(range.empty, new SBinDeserializeException(
         format("input range not empty after full '%s' deserialize", Target.stringof)));
@@ -842,4 +879,84 @@ unittest
     auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
     assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
     assert(equal(cast(ubyte[])foo.b, cast(ubyte[])foo2.b));
+}
+
+unittest
+{
+    import std.variant;
+
+    struct Foo
+    {
+        Algebraic!(int, float, string) data;
+        this(int a) { data = a; }
+        this(float a) { data = a; }
+        this(string a) { data = a; }
+    }
+
+    auto foo = Foo(12);
+    static assert(!__traits(compiles, foo.sbinSerialize.sbinDeserialize!Foo));
+}
+
+unittest
+{
+    import std.algorithm : max;
+
+    union Union
+    {
+        float fval;
+        byte ival;
+    }
+
+    static assert(Union.init.sizeof == max(float.sizeof, byte.sizeof));
+
+    Union u;
+    u.ival = 114;
+    assert (u.ival == 114);
+
+    auto su = u.sbinSerialize.sbinDeserialize!Union;
+    assert (u.ival == 114);
+}
+
+unittest
+{
+    auto buf = appender!(ubyte[]);
+
+    struct Foo1 { void[] a; void[5] b; }
+    auto foo1 = Foo1("hello".dup, cast(void[5])"world");
+
+    sbinSerialize(buf, foo1);
+
+    static struct Foo2
+    {
+        import std.bitmanip : bitfields;
+        mixin(bitfields!(
+            bool, "a", 1,
+            bool, "b", 1,
+            ubyte, "c", 4,
+            ubyte, "d", 2
+        ));
+    }
+
+    Foo2 foo2;
+    foo2.a = true;
+    foo2.b = false;
+    foo2.c = 9;
+    foo2.d = 3;
+
+    sbinSerialize(buf, foo2);
+
+    auto data = buf.data;
+
+    auto dsfoo1 = sbinDeserializePart!Foo1(data);
+    auto dsfoo2 = sbinDeserializePart!Foo2(data);
+
+    assert (data.empty);
+
+    assert(equal(cast(ubyte[])foo1.a, cast(ubyte[])dsfoo1.a));
+    assert(equal(cast(ubyte[])foo1.b, cast(ubyte[])dsfoo1.b));
+    assert(dsfoo2.a);
+    assert(dsfoo2.b == false);
+    assert(dsfoo2.c == 9);
+    assert(dsfoo2.d == 3);
+    
 }

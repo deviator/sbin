@@ -122,6 +122,20 @@ Add to your type:
 
 ## Limitations
 
+### Unions
+
+Unions serializes/deserializes as static byte array without analyze elements (size of union is size of max element).
+
+**If you want use arrays or strings in unions you must implement custom [de]serialize methods.**
+
+### std.variant
+
+Library can't work with `std.variant` types because they contains function pointers.
+
+See [example](example) with `TaggedAlgebraic` if you need variablic types.
+Be careful: dynamic arrays, strings are not serialize, serialize only they
+pointers and lengths. See [Unions limitations](#unions).
+
 ### Max dynamic array length
 
 By default uses `uint` as `length_t`, for using `ulong` use library cofiguration `ulong_length`.
