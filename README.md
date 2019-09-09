@@ -46,8 +46,8 @@ Creates `Unqual!Target ret`, fill it and return.
 
 ### Key points
 
-* all struct fields are serialized and deserialized by default
-* only dynamic arrays has variable length, all other types has fixed size
+* all struct fields are serialized and deserialized by default (no `ignore` or `serializeOnly` features)
+* only dynamic arrays (associative arrays too) has variable length, all other types has fixed size
 
 ### Example
 
@@ -114,11 +114,12 @@ assert(bar.sbinSerialize.length == barSize);
 
 ### Custom [de]serialization algorithm
 
-Add to your type:
+Add to your type `Foo`:
 
-* `void sbinCustomSerialize(R)(ref R r) const` where `R` is output range
-* `static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)` where `R`
-  is input range, `Foo foo` is new instance for deserialization
+* `T sbinCustomRepr() @property const` where `T` is serializable representation
+  of `Foo`, what can be used for full restore data
+* `static Foo sbinFromCustomRepr(auto ref const T repr)` what returns is new
+  instance for your deserialization type
 
 ### TaggedAlgebraic
 
@@ -190,18 +191,15 @@ class Foo
     ulong id;
     this(ulong v) { id = v; }
 
-    void sbinCustomSerialize(R)(ref R r) const
+    ulong sbinCustomRepr() const @property
     {
-        r.put(cast(ubyte)id);
+        return id;
     }
 
     // must be static
-    static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)
+    static Foo sbinFromCustomRepr(ulong v)
     {
-        // must create new class instance
-        foo = new Foo(r.front());
-        // must pop range as default deserialize algorithm
-        r.popFront();
+        return new Foo(v);
     }
 }
 ```

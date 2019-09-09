@@ -138,7 +138,6 @@ unittest
     static assert(is(EnumNumType!Big == ushort));
 }
 
-// only for serialize enums based on strings
 private auto getEnumNum(T)(T val) @safe @nogc pure nothrow
     if (is(T == enum))
 {
@@ -146,6 +145,102 @@ private auto getEnumNum(T)(T val) @safe @nogc pure nothrow
     static foreach (Ret i; 0 .. [EnumMembers!T].length)
         if ((EnumMembers!T)[i] == val) return i;
     return Ret.max;
+}
+
+private bool hasCustomRepr(T)()
+{
+    static if (hasMember!(T, "sbinCustomRepr") && hasMember!(T, "sbinFromCustomRepr"))
+    {
+        static if (isFunction!(T.init.sbinCustomRepr) &&
+                   is(typeof(sbinSerialize(ReturnType!(T.init.sbinCustomRepr).init))))
+        {
+            ReturnType!(T.init.sbinCustomRepr) tmp;
+            return isFunction!(T.sbinFromCustomRepr) &&
+                   is(ReturnType!(T.sbinFromCustomRepr) == Unqual!T) &&
+                   is(typeof(T.sbinFromCustomRepr(tmp)));
+
+        }
+        else return false;
+    }
+    else return false;
+}
+
+unittest
+{
+    static class Foo { ulong id; }
+    static assert (hasCustomRepr!Foo == false);
+}
+
+unittest
+{
+    static class Foo
+    {
+        ulong id;
+        ulong sbinCustomRepr() const @property { return id; }
+    }
+    static assert (hasCustomRepr!Foo == false);
+}
+
+unittest
+{
+    static class Foo
+    {
+        ulong id;
+        this(ulong v) { id = v; }
+        ulong sbinCustomRepr() const @property { return id; }
+        static Foo sbinFromCustomRepr(ulong v) { return new Foo(v); }
+    }
+    static assert (hasCustomRepr!Foo == true);
+}
+
+unittest
+{
+    static class Bar { ulong id; this(ulong v) { id = v; } }
+    static class Foo
+    {
+        ulong id;
+        this(ulong v) { id = v; }
+        Bar sbinCustomRepr() const @property { return new Bar(id); }
+        static Foo sbinFromCustomRepr(Bar v) { return new Foo(v.id); }
+    }
+    static assert (hasCustomRepr!Foo == false);
+}
+
+unittest
+{
+    static struct Bar { ulong id; }
+    static class Foo
+    {
+        ulong id;
+        this(ulong v) { id = v; }
+        Bar sbinCustomRepr() const @property { return Bar(id); }
+        static Foo sbinFromCustomRepr(ref const Bar v) { return new Foo(v.id); }
+    }
+    static assert (hasCustomRepr!Foo == true);
+}
+
+unittest
+{
+    static class Foo
+    {
+        ulong id;
+        this(ulong v) { id = v; }
+        ulong sbinCustomRepr() const @property { return id; }
+        static Foo sbinFromCustomRepr(ulong v, int add) { return new Foo(v+add); }
+    }
+    static assert (hasCustomRepr!Foo == false);
+}
+
+unittest
+{
+    static class Foo
+    {
+        ulong id;
+        this(ulong v) { id = v; }
+        ulong sbinCustomRepr() const @property { return id; }
+        static Foo sbinFromCustomRepr(ulong v, int add=1) { return new Foo(v+add); }
+    }
+    static assert (hasCustomRepr!Foo == true);
 }
 
 /++ Serialize to output ubyte range
@@ -213,10 +308,13 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
                 }
             }
         }
-        //else static if (is(typeof(val.sbinCustomSerialize(r))))
+        else static if (hasCustomRepr!T)
+        {
+            sbinSerialize(r, val.sbinCustomRepr());
+        }
         else static if (hasMember!(T, "sbinCustomSerialize"))
         {
-            val.sbinCustomSerialize(r);
+            static assert(0, "sbinCustomSerialize is deprecated, use sbinCustomRepr instead");
         }
         else static if (is(T == struct))
         {
@@ -246,7 +344,7 @@ ubyte[] sbinSerialize(T)(auto ref const T val)
 {
     auto buf = appender!(ubyte[]);
     sbinSerialize(buf, val);
-    return buf.data.dup;
+    return buf.data;
 }
 
 /++ Deserialize `Target` value
@@ -401,10 +499,15 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
                 }
             }
         }
-        //else static if (is(typeof(T.sbinCustomDeserialize(r, trg))))
+        else static if (hasCustomRepr!T)
+        {
+            ReturnType!(trg.sbinCustomRepr) tmp;
+            impl(r, tmp, ff("customRepr"));
+            trg = T.sbinFromCustomRepr(tmp);
+        }
         else static if (hasMember!(T, "sbinCustomDeserialize"))
         {
-            T.sbinCustomDeserialize(r, trg);
+            static assert(0, "sbinCustomDeserialize is deprecated: use sbinFromCustomRepr");
         }
         else static if (is(T == struct))
         {
@@ -780,16 +883,15 @@ unittest
     static struct Foo
     {
         ulong id;
-        void sbinCustomSerialize(R)(ref R r) const
+        ulong sbinCustomRepr() const @property
         {
-            r.put(cast(ubyte)id);
             ser = true;
+            return id;
         }
-        static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)
+        static Foo sbinFromCustomRepr(ulong v)
         {
-            foo.id = r.front();
-            r.popFront();
             deser = true;
+            return Foo(v);
         }
     }
 
@@ -807,16 +909,15 @@ unittest
     {
         ulong id;
         this(ulong v) { id = v; }
-        void sbinCustomSerialize(R)(ref R r) const
+        ulong sbinCustomRepr() const
         {
-            r.put(cast(ubyte)id);
             ser = true;
+            return id;
         }
-        static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)
+        static Foo sbinFromCustomRepr(ref const ulong v)
         {
-            foo = new Foo(r.front());
-            r.popFront();
             deser = true;
+            return new Foo(v);
         }
     }
 
@@ -839,8 +940,8 @@ unittest
 unittest
 {
     // for classes need
-    // void sbinCustomSerialize(R)(ref R r) const
-    // static void sbinCustomDeserialize(R)(ref R r, ref Foo foo)
+    // T sbinCustomRepr() const
+    // static Foo sbinCustomDeserialize(T repr)
     static class Foo
     {
         ulong id;
@@ -849,6 +950,7 @@ unittest
 
     auto foo = new Foo(12);
 
+    static assert(!is(typeof(foo.sbinSerialize)));
     static assert(!is(typeof(foo.sbinSerialize.sbinDeserialize!Foo.id)));
 }
 
