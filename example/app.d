@@ -23,10 +23,10 @@ void barTest()
 {
     auto bar = Bar(4, [TUnion.count(42), TUnion.str("Hello"), TUnion.foo(Foo("ABC"))]);
     auto sdbar_data = bar.sbinSerialize;
-    assert (sdbar_data.length == int.sizeof + length_t.sizeof +
+    assert (sdbar_data.length == int.sizeof + 1 /+length_t.sizeof+/ +
         byte.sizeof + int.sizeof + // count 
-        byte.sizeof + length_t.sizeof + 5 + // str
-        byte.sizeof + length_t.sizeof + 3 // Foo
+        byte.sizeof + 1 /+length_t.sizeof+/ + 5 + // str
+        byte.sizeof + 1 /+length_t.sizeof+/ + 3 // Foo
     );
     auto sdbar = sdbar_data.sbinDeserialize!Bar;
 
@@ -62,10 +62,10 @@ void bar2Test()
     TAlg t_foo = Foo("ABC");
     auto bar = Bar2([t_count, t_str, t_foo]);
     auto sdbar_data = bar.sbinSerialize;
-    assert (sdbar_data.length == length_t.sizeof +
+    assert (sdbar_data.length == 1 /+length_t.sizeof+/ +
         byte.sizeof + int.sizeof + // count 
-        byte.sizeof + length_t.sizeof + 5 + // str
-        byte.sizeof + length_t.sizeof + 3 // Foo
+        byte.sizeof + 1 /+length_t.sizeof+/ + 5 + // str
+        byte.sizeof + 1 /+length_t.sizeof+/ + 3 // Foo
     );
     auto sdbar = sdbar_data.sbinDeserialize!Bar2;
 

@@ -7,11 +7,3 @@ license "MIT"
 targetType "library"
 
 dependency "taggedalgebraic" version="~>0.11.4" optional=true
-
-configuration "default" {
-    versions "sbin_default"
-}
-
-configuration "ulong_length" {
-    versions "sbin_ulong_length"
-}
