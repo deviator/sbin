@@ -13,7 +13,7 @@ d:
  - dmd-2.085.1
 script:
  - dub --root=example --compiler=${DC}
- - dub test --compiler=${DC} --config=ulong_length
+ - dub test --compiler=${DC}
  - dub test --compiler=${DC} --build=unittest-cov
 after_success:
  - bash <(curl -s https://codecov.io/bash)
