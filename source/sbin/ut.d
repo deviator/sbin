@@ -69,7 +69,7 @@ unittest
     //                  a              b         c       d
     const foo1Size = ulong.sizeof + float.sizeof * 2 + ushort.sizeof +
     //                            str                      color
-            (1 /+length_t.sizeof+/ + foo1.str.length) + ubyte.sizeof; // 1 is length data because length < 127 (zigzag pack)
+            (1 /+length_t.sizeof+/ + foo1.str.length) + ubyte.sizeof; // 1 is length data because length < 127 (vluint pack)
 
     // color is ubyte because [EnumMembers!Color].length < ubyte.max
 

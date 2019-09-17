@@ -1,16 +1,17 @@
-module sbin.zigzag;
+/// variable length unsigned integers
+module sbin.vluint;
 
 import std.range;
 import std.traits : isUnsigned;
 
 ///
-void dumpZigZag(R)(ref R r, ulong val) if (isOutputRange!(R, ubyte))
+void dumpVLUInt(R)(ref R r, ulong val) if (isOutputRange!(R, ubyte))
 {
     immutable mask = cast(ubyte)0b0111_1111;
     immutable flag = cast(ubyte)0b1000_0000;
     do
     {
-        r.put(cast(ubyte)((val & mask) + (val >= flag ? flag : 0)));
+        put(r, cast(ubyte)((val & mask) + (val >= flag ? flag : 0)));
         val >>= 7;
     }
     while (val > 0);
@@ -28,7 +29,7 @@ unittest
     foreach (i; 0 .. 128)
     {
         buf.clear();
-        dumpZigZag(buf, i);
+        dumpVLUInt(buf, i);
         assert (buf.data.length == 1);
         assert (buf.data[0] == i);
     }
@@ -36,7 +37,7 @@ unittest
     foreach (i; 128 .. 256)
     {
         buf.clear();
-        dumpZigZag(buf, i);
+        dumpVLUInt(buf, i);
         assert (buf.data.length == 2);
         assert (buf.data[0] == (i & 0b0111_1111) + 0b1000_0000);
         assert (buf.data[1] == 1);
@@ -45,7 +46,7 @@ unittest
     void test(ulong val, ubyte[] need, string file=__FILE__, size_t line=__LINE__)
     {
         buf.clear();
-        dumpZigZag(buf, val);
+        dumpVLUInt(buf, val);
         enforce(buf.data == need, "fail", file, line);
     }
 
@@ -71,7 +72,7 @@ unittest
 }
 
 ///
-ulong readZigZag(R)(auto ref R r, int* count=null) //if (isInputRange!(R, ubyte))
+ulong readVLUInt(R)(auto ref R r, int* count=null) //if (isInputRange!(R, ubyte))
     if (is(typeof(r.front()) == ubyte) && is(typeof(r.popFront())))
 {
     immutable mask = 0b0111_1111uL;
@@ -99,13 +100,13 @@ unittest
     foreach (ubyte i; 0 .. 128)
     {
         ubyte[] buf = [i];
-        assert(readZigZag(buf) == i);
+        assert(readVLUInt(buf) == i);
     }
 
     void test(ulong val, ubyte[] need, string file=__FILE__, size_t line=__LINE__)
     {
         int cnt;
-        auto readed = readZigZag(need.dup, &cnt);
+        auto readed = readVLUInt(need.dup, &cnt);
         //import std.stdio;
         //stderr.writeln(cnt, " ", need.length);
         //stderr.writeln(val, " ", readed, " ", val-readed);
@@ -171,13 +172,13 @@ unittest
         buf.c = 0;
 
         sw1.start();
-        dumpZigZag(buf, i);
+        dumpVLUInt(buf, i);
         sw1.stop();
 
         buf.c = 0;
 
         sw2.start();
-        const v = readZigZag(buf);
+        const v = readVLUInt(buf);
         sw2.stop();
         assert(i == v);
     }

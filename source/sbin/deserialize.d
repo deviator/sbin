@@ -3,7 +3,7 @@ module sbin.deserialize;
 import std.format;
 
 import sbin.type;
-import sbin.zigzag;
+import sbin.vluint;
 import sbin.exception;
 
 /++ Deserialize part of input ragne to `Target` value
@@ -69,8 +69,6 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         {
             alias ENT = EnumNumType!T;
             ubyte[ENT.sizeof] tmp;
-            //version (LDC) auto _field = "<LDC-1.4.0 workaround>";
-            //else alias _field = field;
             foreach (i, ref v; tmp)
                 v = pop(r, field, T.stringof, i, T.sizeof);
             trg = [EnumMembers!T][tmp.unpack!ENT];
@@ -78,8 +76,6 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         else static if (is(T : double) || is(T : long))
         {
             ubyte[T.sizeof] tmp;
-            //version (LDC) auto _field = "<LDC-1.4.0 workaround>";
-            //else alias _field = field;
             foreach (i, ref v; tmp)
                 v = pop(r, field, T.stringof, i, T.sizeof);
             trg = tmp.unpack!T;
@@ -88,8 +84,8 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         {
             static if (isDynamicArray!T)
             {
-                setRngFields(r, ff("length"), "zigzag", 0, 10);
-                const l = cast(size_t)readZigZag(r);
+                setRngFields(r, ff("length"), "vluint", 0, 10);
+                const l = cast(size_t)readVLUInt(r);
                 if (trg.length != l) trg.length = l;
             }
 
@@ -104,8 +100,8 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         }
         else static if (isSomeString!T)
         {
-            setRngFields(r, ff("length"), "zigzag", 0, 10);
-            const l = cast(size_t)readZigZag(r);
+            setRngFields(r, ff("length"), "vluint", 0, 10);
+            const l = cast(size_t)readVLUInt(r);
             auto tmp = new ubyte[](l);
             foreach (i, ref v; tmp)
                 v = pop(r, fi(i), T.stringof, i, l);
@@ -113,16 +109,16 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         }
         else static if (isDynamicArray!T)
         {
-            setRngFields(r, ff("length"), "zigzag", 0, 10);
-            const l = cast(size_t)readZigZag(r);
+            setRngFields(r, ff("length"), "vluint", 0, 10);
+            const l = cast(size_t)readVLUInt(r);
             if (trg.length != l) trg.length = l;
             foreach (i, ref v; trg)
                 impl(r, v, fi(i));
         }
         else static if (isAssociativeArray!T)
         {
-            setRngFields(r, ff("length"), "zigzag", 0, 10);
-            const length = cast(size_t)readZigZag(r);
+            setRngFields(r, ff("length"), "vluint", 0, 10);
+            const length = cast(size_t)readVLUInt(r);
 
             trg.clear();
 

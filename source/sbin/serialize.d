@@ -3,7 +3,7 @@ module sbin.serialize;
 import std.array : appender;
 
 import sbin.type;
-import sbin.zigzag;
+import sbin.vluint;
 
 /++ Serialize to output ubyte range
 
@@ -29,7 +29,7 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         else static if (isVoidArray!T)
         {
             static if (isDynamicArray!T)
-                dumpZigZag(r, val.length);
+                dumpVLUInt(r, val.length);
             put(r, cast(ubyte[])val[]);
         }
         else static if (isStaticArray!T)
@@ -39,18 +39,18 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         }
         else static if (isSomeString!T)
         {
-            dumpZigZag(r, val.length);
+            dumpVLUInt(r, val.length);
             put(r, cast(ubyte[])val);
         }
         else static if (isDynamicArray!T)
         {
-            dumpZigZag(r, val.length);
+            dumpVLUInt(r, val.length);
             foreach (ref v; val)
                 sbinSerialize(r, v);
         }
         else static if (isAssociativeArray!T)
         {
-            dumpZigZag(r, val.length);
+            dumpVLUInt(r, val.length);
             foreach (k, ref v; val)
             {
                 sbinSerialize(r, k);
