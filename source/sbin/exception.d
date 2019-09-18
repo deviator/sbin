@@ -31,7 +31,8 @@ class SBinDeserializeEmptyRangeException : SBinDeserializeException
     size_t readed, expected, fullReaded;
     ///
     this(string mainType, string fieldName, string fieldType,
-         size_t readed, size_t expected, size_t fullReaded) @safe pure
+         size_t readed, size_t expected, size_t fullReaded,
+         string file=__FILE__, size_t line=__LINE__) @safe pure
     {
         this.mainType = mainType;
         this.fieldName = fieldName;
@@ -42,6 +43,6 @@ class SBinDeserializeEmptyRangeException : SBinDeserializeException
         super(format!("empty input range while "~
                 "deserialize '%s' element %s:%s %d/%d (readed/expected), "~
                 "readed message %d bytes")(mainType, fieldName,
-                fieldType, readed, expected, fullReaded));
+                fieldType, readed, expected, fullReaded), file, line);
     }
 }
