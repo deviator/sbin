@@ -15,20 +15,46 @@ import sbin.exception;
 void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
     if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte))
 {
+    import sbin.util.stack : Stack;
+
+    static struct FieldName
+    {
+        string name;
+        ptrdiff_t index = -1;
+
+        string toString() const
+        {
+            if (index != -1) return format!"%s[%d]"(name, index);
+            else return name;
+        }
+    }
+
+    alias FNStack = Stack!(FieldName, 8);
+
+    FNStack fNameStack;
+
     static struct WrapRng
     {
         R* rng;
         size_t* count;
+        FNStack* fstack;
 
-        string delegate() field;
-        string delegate() type;
-        size_t delegate() vcnt;
-        size_t delegate() vexp;
+        string field() const
+        {
+            import std.algorithm: map, joiner;
+            import std.array : array;
+            import std.conv : to;
+            return fstack.getData().map!(a=>a.toString()).joiner(".").array.to!string;
+        }
+
+        string type;
+        size_t vcnt;
+        size_t vexp;
 
         ubyte front() @property
         {
             enforce (!(*rng).empty, new SBinDeserializeEmptyRangeException(
-                        Target.stringof, field(), type(), vcnt(), vexp(), *count));
+                        Target.stringof, field(), type, vcnt, vexp, *count));
             return (*rng).front;
         }
 
@@ -41,93 +67,100 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         bool empty() @property { return (*rng).empty; }
     }
 
-    void setRngFields(ref WrapRng rng, lazy string field, lazy string type,
-                lazy size_t vcnt, lazy size_t vexp)
+    void setRngFields(ref WrapRng rng, string type, size_t vcnt, size_t vexp)
+    { rng.type = type; rng.vcnt = vcnt; rng.vexp = vexp; }
+
+    struct StackHolder
     {
-        rng.field = (){ return field; };
-        rng.type = (){ return type; };
-        rng.vcnt = (){ return vcnt; };
-        rng.vexp = (){ return vexp; };
+        this(string name, ptrdiff_t idx=-1)
+        { fNameStack.push(FieldName(name, idx)); }
+        ~this() { fNameStack.pop(); }
     }
 
-    ubyte pop(ref WrapRng rng, lazy string field, lazy string type,
-                lazy size_t vcnt, lazy size_t vexp)
+    ubyte pop(ref WrapRng rng, string field, size_t idx, string type, size_t vcnt, size_t vexp)
     {
-        setRngFields(rng, field, type, vcnt, vexp);
-
+        const _ = StackHolder(field, idx);
+        setRngFields(rng, type, vcnt, vexp);
         auto ret = rng.front();
         rng.popFront();
         return ret;
     }
 
-    auto impl(T)(ref WrapRng r, ref T trg, lazy string field)
+    auto impl(T)(ref WrapRng r, ref T trg, string field, ptrdiff_t idx=-1)
     {
-        string ff(lazy string n) { return field ~ "." ~ n; }
-        string fi(size_t i) { return field ~ format("[%d]", i); }
-
+        const __ = StackHolder(field, idx);
         static if (is(T == enum))
         {
+            immutable EM = [EnumMembers!T];
             alias ENT = EnumNumType!T;
             ubyte[ENT.sizeof] tmp;
             foreach (i, ref v; tmp)
-                v = pop(r, field, T.stringof, i, T.sizeof);
-            trg = [EnumMembers!T][tmp.unpack!ENT];
+                v = pop(r, "byte", i, T.stringof, i, ENT.sizeof);
+            trg = EM[tmp.unpack!ENT];
         }
         else static if (is(T : double) || is(T : long))
         {
             ubyte[T.sizeof] tmp;
             foreach (i, ref v; tmp)
-                v = pop(r, field, T.stringof, i, T.sizeof);
+                v = pop(r, "byte", i, T.stringof, i, T.sizeof);
             trg = tmp.unpack!T;
         }
         else static if (isVoidArray!T)
         {
             static if (isDynamicArray!T)
             {
-                setRngFields(r, ff("length"), "vluint", 0, 10);
+                auto _ = StackHolder("length");
+                setRngFields(r, "vluint", 0, 10);
                 const l = cast(size_t)readVLUInt(r);
                 if (trg.length != l) trg.length = l;
             }
 
             auto tmp = cast(ubyte[])trg[];
-            foreach (i, ref v; tmp)
-                impl(r, v, fi(i));
+            foreach (i, ref v; tmp) impl(r, v, "elem", i);
         }
         else static if (isStaticArray!T)
         {
-            foreach (i, ref v; trg)
-                impl(r, v, fi(i));
+            foreach (i, ref v; trg) impl(r, v, "elem", i);
         }
         else static if (isSomeString!T)
         {
-            setRngFields(r, ff("length"), "vluint", 0, 10);
-            const l = cast(size_t)readVLUInt(r);
-            auto tmp = new ubyte[](l);
+            const len = (() {
+                auto _ = StackHolder("length");
+                setRngFields(r, "vluint", 0, 10);
+                return cast(size_t)readVLUInt(r);
+            })();
+            auto tmp = new ubyte[](len);
             foreach (i, ref v; tmp)
-                v = pop(r, fi(i), T.stringof, i, l);
+                v = pop(r, "elem", i, T.stringof, i, len);
             trg = cast(T)tmp;
         }
         else static if (isDynamicArray!T)
         {
-            setRngFields(r, ff("length"), "vluint", 0, 10);
-            const l = cast(size_t)readVLUInt(r);
-            if (trg.length != l) trg.length = l;
-            foreach (i, ref v; trg)
-                impl(r, v, fi(i));
+            const len = (()
+            {
+                auto _ = StackHolder("length");
+                setRngFields(r, "vluint", 0, 10);
+                return cast(size_t)readVLUInt(r);
+            })();
+            if (trg.length != len) trg.length = len;
+            foreach (i, ref v; trg) impl(r, v, "elem", i);
         }
         else static if (isAssociativeArray!T)
         {
-            setRngFields(r, ff("length"), "vluint", 0, 10);
-            const length = cast(size_t)readVLUInt(r);
+            const len = ((){
+                auto _ = StackHolder("length");
+                setRngFields(r, "vluint", 0, 10);
+                return cast(size_t)readVLUInt(r);
+            })();
 
             trg.clear();
 
-            foreach (i; 0 .. length)
+            foreach (i; 0 .. len)
             {
                 KeyType!T k;
                 ValueType!T v;
-                impl(r, k, fi(i)~".key");
-                impl(r, v, fi(i)~".val");
+                impl(r, k, "key", i);
+                impl(r, v, "value", i);
                 trg[k] = v;
             }
 
@@ -138,14 +171,14 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
             import std.algorithm.mutation : move;
 
             T.Kind kind;
-            impl(r, kind, ff("kind"));
+            impl(r, kind, "kind");
             FS: final switch (kind)
             {
                 static foreach (k; EnumMembers!(T.Kind))
                 {
                     case k:
                         TypeOf!k tmp;
-                        impl(r, tmp, ff("value"));
+                        impl(r, tmp, "value");
                         static if (isTagged!(T).tUnion)
                             trg.set!k(move(tmp));
                         else
@@ -157,30 +190,31 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         else static if (hasCustomRepr!T)
         {
             ReturnType!(trg.sbinCustomRepr) tmp;
-            impl(r, tmp, ff("customRepr"));
+            impl(r, tmp, "customRepr");
             trg = T.sbinFromCustomRepr(tmp);
         }
         else static if (is(T == struct))
         {
             foreach (i, ref v; trg.tupleof)
-                impl(r, v, ff(__traits(identifier, trg.tupleof[i])));
+                impl(r, v, __traits(identifier, trg.tupleof[i]));
         }
         else static if (is(T == union))
         {
             auto tmp = cast(ubyte[])((cast(void*)&trg)[0..T.sizeof]);
-            foreach (i, ref v; tmp) impl(r, v, fi(i));
+            foreach (i, ref v; tmp)
+                v = pop(r, "byte", i, T.stringof, i, T.sizeof);
         }
         else static assert(0, "unsupported type: " ~ T.stringof);
     }
 
     size_t cnt;
 
-    auto wr = WrapRng(&range, &cnt);
+    auto wr = WrapRng(&range, &cnt, &fNameStack);
 
     static if (Target.length == 1)
-        impl(wr, target[0], typeof(target[0]).stringof);
-    else foreach (ref v; target)
-        impl(wr, v, typeof(v).stringof);
+        impl(wr, target[0], "root");
+    else foreach (i, ref v; target)
+        impl(wr, v, "root", i);
 }
 
 /++ Deserialize part of input range to `Target` value

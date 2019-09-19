@@ -577,5 +577,95 @@ unittest
     assert(dsfoo2.b == false);
     assert(dsfoo2.c == 9);
     assert(dsfoo2.d == 3);
-    
+}
+
+unittest
+{
+    enum Label { good, bad }
+    static struct Pos { int x, y; }
+    static struct Point { Pos position; Label label; }
+
+    Point[2] val = [
+        Point(Pos(3,7), Label.good),
+        Point(Pos(9,5), Label.bad),
+    ];
+    auto data = sbinSerialize(val);
+
+    assert(data.length == 18);
+
+    import std.algorithm : canFind;
+
+    {
+        bool throws;
+        try auto dsv = sbinDeserialize!(Point[2])(data[0..$-3]);
+        catch (SBinDeserializeEmptyRangeException e)
+        {
+            throws = true;
+            assert (e.msg.canFind("root.elem[1].position.y.byte[2]:int 2/4"), e.msg);
+        }
+        assert (throws);
+    }
+    {
+        bool throws;
+        try auto dsv = sbinDeserialize!(Point[2])(data[0..$-1]);
+        catch (SBinDeserializeEmptyRangeException e)
+        {
+            throws = true;
+            assert (e.msg.canFind("root.elem[1].label.byte[0]:Label 0/1"), e.msg);
+        }
+        assert (throws);
+    }
+    {
+        bool throws;
+        try auto dsv = sbinDeserialize!(Point[2])(data[0..$/2+1]);
+        catch (SBinDeserializeEmptyRangeException e)
+        {
+            throws = true;
+            assert (e.msg.canFind("root.elem[1].position.x.byte[1]:int 1/4"), e.msg);
+        }
+        assert (throws);
+    }
+    {
+        bool throws;
+        try auto dsv = sbinDeserialize!(Point[2])(data[0..$/2-1]);
+        catch (SBinDeserializeEmptyRangeException e)
+        {
+            throws = true;
+            assert (e.msg.canFind("root.elem[0].label.byte[0]:Label 0/1"), e.msg);
+        }
+        assert (throws);
+    }
+}
+
+unittest
+{
+    ushort[] val = [10,12,14,15];
+
+    auto data = sbinSerialize(val);
+
+    assert(data.length == 9);
+
+    import std.algorithm : canFind;
+
+    {
+        bool throws;
+        try auto dsv = sbinDeserialize!(ushort[])(data[0..$-3]);
+        catch (SBinDeserializeEmptyRangeException e)
+        {
+            throws = true;
+            assert (e.msg.canFind("root.elem[2].byte[1]:ushort 1/2"), e.msg);
+        }
+        assert (throws);
+    }
+
+    {
+        bool throws;
+        try auto dsv = sbinDeserialize!(ushort[])(data[0..0]);
+        catch (SBinDeserializeEmptyRangeException e)
+        {
+            throws = true;
+            assert (e.msg.canFind("root.length:vluint 0/10"), e.msg);
+        }
+        assert (throws);
+    }
 }
