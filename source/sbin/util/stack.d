@@ -1,14 +1,14 @@
 module sbin.util.stack;
 
+pragma(msg, "\x1b[0;30;43m", __FILE__,":",__LINE__+3, " TODO chage to private", "\x1b[0m");
 struct Stack(T, size_t N=0)
 {
     //private
     public
     {
-    ptrdiff_t topI = 0;
-
-    static if (N) T[N] sdata;
-    T[] data;
+        ptrdiff_t topI = 0;
+        static if (N) T[N] sdata;
+        T[] data;
     }
 
     private void pushDynamic(T val)
@@ -33,7 +33,7 @@ struct Stack(T, size_t N=0)
         static if (N)
         {
             if (topI <= cast(ptrdiff_t)N) return sdata[0..topI];
-            else return (sdata[] ~ data)[0..topI-N];
+            else return (sdata[] ~ data)[0..topI];
         }
         else return data[0..topI];
     }
@@ -80,16 +80,21 @@ version (unittest) void testStack(size_t N)()
 
     import std.exception : assertThrown;
     import core.exception : RangeError, AssertError;
+    import std.algorithm : equal, map;
+    import std.range : iota, chain;
 
     assertThrown!RangeError(s.top);
     assertThrown!AssertError(s.pop());
 
     foreach (i; 1..10) s.push(i*10);
+    assert (equal(s.getData(), iota(1,10).map!"a*10"));
     foreach_reverse (i; 1..10) assert (s.pop() == i*10);
 
     foreach (i; 1..100) s.push(i*3);
+    assert (equal(s.getData(), iota(1,100).map!"a*3"));
     assert(s.pop() == 99*3);
     foreach (i; 1..10) s.push(i*2);
+    assert (equal(s.getData(), chain(iota(1,99).map!"a*3", iota(1,10).map!"a*2")));
     foreach_reverse (i; 1..10) assert (s.pop() == i*2);
     foreach_reverse (i; 1..99) assert (s.pop() == i*3);
 
@@ -102,15 +107,6 @@ version (unittest) void testStack(size_t N)()
 
 unittest
 {
-    testStack!0;
-    testStack!1;
-    testStack!5;
-    testStack!8;
-    testStack!9;
-    testStack!10;
-    testStack!11;
-    testStack!12;
-    testStack!99;
-    testStack!100;
-    testStack!101;
+    static foreach (N; [0,1,5,8,9,10,11,12,99,100,101,196])
+        testStack!N;
 }
