@@ -376,7 +376,7 @@ unittest
             ser = true;
             return id;
         }
-        static Foo sbinFromCustomRepr(ref const ulong v)
+        static Foo sbinFromCustomRepr()(auto ref const ulong v)
         {
             deser = true;
             return new Foo(v);

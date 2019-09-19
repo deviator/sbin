@@ -34,11 +34,30 @@ template isTagged(T)
     }
 }
 
-bool isVoidArray(T)()
+template isVoidArray(T)
 {
     static if( (is(T U == U[]) || is(T U == U[N], size_t N)) &&
-                is(Unqual!U == void)) return true;
-    else return false;
+                is(Unqual!U == void)) enum isVoidArray = true;
+    else enum isVoidArray = false;
+}
+
+unittest
+{
+    assert (isVoidArray!(void[]));
+    assert (isVoidArray!(void[2]));
+    assert (isVoidArray!(const(void)[]));
+    assert (isVoidArray!(const(void[])));
+    assert (isVoidArray!(const(void)[2]));
+    assert (isVoidArray!(const(void[2])));
+    assert (isVoidArray!(immutable(void)[]));
+    assert (isVoidArray!(immutable(void[])));
+    assert (isVoidArray!(immutable(void)[2]));
+    assert (isVoidArray!(immutable(void[2])));
+
+    assert (!isVoidArray!(long[]));
+    assert (!isVoidArray!(long[2]));
+    assert (!isVoidArray!(byte[]));
+    assert (!isVoidArray!(byte[2]));
 }
 
 template EnumNumType(T) if (is(T == enum))
@@ -84,6 +103,7 @@ unittest
     mixin(bigElems());
 
     static assert(is(EnumNumType!Big == ushort));
+    assert(is(EnumNumType!Big == ushort));
 }
 
 ///
@@ -101,27 +121,22 @@ unittest
     enum Foo { one, two }
     assert (getEnumNum(Foo.two) == 1);
     static assert(is(typeof(getEnumNum(Foo.two)) == ubyte));
+    assert(is(typeof(getEnumNum(Foo.two)) == ubyte));
 }
 
 ///
-bool hasCustomRepr(T)()
+template hasCustomRepr(T)
 {
     static if (hasMember!(T, "sbinCustomRepr") && hasMember!(T, "sbinFromCustomRepr"))
     {
         import sbin.serialize : sbinSerialize;
 
-        static if (isFunction!(T.init.sbinCustomRepr) &&
-                   is(typeof(sbinSerialize(ReturnType!(T.init.sbinCustomRepr).init))))
-        {
-            ReturnType!(T.init.sbinCustomRepr) tmp;
-            return isFunction!(T.sbinFromCustomRepr) &&
-                   is(ReturnType!(T.sbinFromCustomRepr) == Unqual!T) &&
-                   is(typeof(T.sbinFromCustomRepr(tmp)));
+        alias Repr = ReturnType!(() => T.init.sbinCustomRepr);
 
-        }
-        else return false;
+        enum hasCustomRepr = is(typeof(sbinSerialize(Repr.init))) && 
+                is(typeof(((){ return T.sbinFromCustomRepr(Repr.init); })()) == Unqual!T);
     }
-    else return false;
+    else enum hasCustomRepr = false;
 }
 
 unittest
@@ -138,6 +153,7 @@ unittest
         ulong sbinCustomRepr() const @property { return id; }
     }
     static assert (hasCustomRepr!Foo == false);
+    assert (hasCustomRepr!Foo == false);
 }
 
 unittest
@@ -150,6 +166,11 @@ unittest
         static Foo sbinFromCustomRepr(ulong v) { return new Foo(v); }
     }
     static assert (hasCustomRepr!Foo == true);
+    assert (hasCustomRepr!Foo == true);
+    auto foo = new Foo(12);
+    assert (foo.sbinCustomRepr == 12);
+    auto foo2 = Foo.sbinFromCustomRepr(foo.sbinCustomRepr);
+    assert (foo.id == foo2.id);
 }
 
 unittest
@@ -173,7 +194,7 @@ unittest
         ulong id;
         this(ulong v) { id = v; }
         Bar sbinCustomRepr() const @property { return Bar(id); }
-        static Foo sbinFromCustomRepr(ref const Bar v) { return new Foo(v.id); }
+        static Foo sbinFromCustomRepr()(auto ref const Bar v) { return new Foo(v.id); }
     }
     import sbin.serialize : sbinSerialize;
     static assert (is(typeof(sbinSerialize(Bar.init))));
