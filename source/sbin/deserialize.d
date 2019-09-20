@@ -4,6 +4,7 @@ import std.format;
 
 import sbin.type;
 import sbin.vluint;
+import sbin.zigzag;
 import sbin.exception;
 
 /++ Deserialize part of input ragne to `Target` value
@@ -97,6 +98,16 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
             foreach (i, ref v; tmp)
                 v = pop(r, "byte", i, T.stringof, i, ENT.sizeof);
             trg = EM[tmp.unpack!ENT];
+        }
+        else static if (is(T == vluint))
+        {
+            setRngFields(r, "vluint", 0, 10);
+            trg = vluint(readVLUInt(r));
+        }
+        else static if (is(T == vlint))
+        {
+            setRngFields(r, "vlint", 0, 10);
+            trg = vlint(zzDecode(readVLUInt(r)));
         }
         else static if (is(T : double) || is(T : long))
         {

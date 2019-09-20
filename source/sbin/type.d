@@ -5,7 +5,17 @@ package import std.range;
 
 import std.bitmanip : nativeToLittleEndian, littleEndianToNative;
 
-alias length_t = uint;
+struct vluint
+{
+    ulong value;
+    alias value this;
+}
+
+struct vlint
+{
+    long value;
+    alias value this;
+}
 
 package alias pack = nativeToLittleEndian;
 

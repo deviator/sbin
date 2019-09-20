@@ -4,6 +4,7 @@ import std.array : appender;
 
 import sbin.type;
 import sbin.vluint;
+import sbin.zigzag;
 
 /++ Serialize to output ubyte range
 
@@ -21,6 +22,14 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         static if (is(T == enum))
         {
             put(r, getEnumNum(val).pack[]);
+        }
+        else static if (is(T == vluint))
+        {
+            dumpVLUInt(r, val.value);
+        }
+        else static if (is(T == vlint))
+        {
+            dumpVLUInt(r, zzEncode(val.value));
         }
         else static if (is(T : double) || is(T : long))
         {

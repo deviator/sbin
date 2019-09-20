@@ -669,3 +669,56 @@ unittest
         assert (throws);
     }
 }
+
+unittest
+{
+    short[] value;
+    auto rng = sbinSerialize(value);
+    assert (rng.length == 1);
+    assert (rng[0] == 0);
+
+    auto des = sbinDeserialize!(short[])(rng);
+    assert (des.length == 0);
+}
+
+unittest
+{
+    vlint[] value = [vlint(1),vlint(2),vlint(3)];
+    auto rng = sbinSerialize(value);
+    assert (rng.length == 4);
+    assert (rng[0] == 3);
+    assert (rng[1] == 2);
+    assert (rng[2] == 4);
+    assert (rng[3] == 6);
+
+    auto des = sbinDeserialize!(typeof(value))(rng);
+    assert (value == des);
+}
+
+unittest
+{
+    vlint[] value = [vlint(1),vlint(-130),vlint(3)];
+    auto rng = sbinSerialize(value);
+    assert (rng.length == 5);
+    assert (rng[0] == 3);
+    assert (rng[1] == 2);
+    //assert (rng[2] == 4);
+    assert (rng[4] == 6);
+
+    auto des = sbinDeserialize!(typeof(value))(rng);
+    assert (value == des);
+}
+
+unittest
+{
+    vluint[] value = [vluint(1),vluint(2),vluint(3)];
+    auto rng = sbinSerialize(value);
+    assert (rng.length == 4);
+    assert (rng[0] == 3);
+    assert (rng[1] == 1);
+    assert (rng[2] == 2);
+    assert (rng[3] == 3);
+
+    auto des = sbinDeserialize!(typeof(value))(rng);
+    assert (value == des);
+}
