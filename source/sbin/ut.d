@@ -11,7 +11,7 @@ version (unittest) import std.algorithm : equal;
 
 unittest
 {
-    auto a = 123;
+    const a = 123;
     assert(a.sbinSerialize.sbinDeserialize!int == a);
 }
 
@@ -38,7 +38,7 @@ unittest
 
 unittest
 {
-    int[5] a = [1,2,3,2,3];
+    const int[5] a = [1,2,3,2,3];
     assert(a.sbinSerialize.sbinDeserialize!(typeof(a)) == a);
 }
 
@@ -119,7 +119,7 @@ unittest
 
     auto sdata = data.sbinSerialize;
     assert( equal(sdata.sbinDeserialize!(Bar[]), data));
-    data[0].foos[1].d = 12345;
+    data[0].foos[1].d = 12_345;
     assert(!equal(sdata.sbinDeserialize!(Bar[]), data));
 }
 
@@ -130,8 +130,8 @@ unittest
 
     auto a = ParameterDefaults!foo;
 
-    import std.typecons;
-    auto sa = tuple(a).sbinSerialize;
+    import std.typecons : tuple;
+    const sa = tuple(a).sbinSerialize;
 
     Parameters!foo b;
     b = sa.sbinDeserialize!(typeof(tuple(b)));
@@ -185,12 +185,12 @@ unittest
     auto a = X([3: "hello", 8: "abc"], ["ok": 1, "no": 2]);
     auto b = X([8: "abc", 15: "ololo"], ["zb": 10]);
 
-    auto as = a.sbinSerialize;
-    auto bs = b.sbinSerialize;
+    const as = a.sbinSerialize;
+    const bs = b.sbinSerialize;
 
     auto c = as.sbinDeserialize!X;
 
-    import std.algorithm;
+    import std.algorithm : sort;
     assert(equal(sort(a.one.keys.dup), sort(c.one.keys.dup)));
     assert(equal(sort(a.one.values.dup), sort(c.one.values.dup)));
 
@@ -205,7 +205,7 @@ unittest
     enum T { one, two, three }
     T[] a;
     with(T) a = [one, two, three, two, three, two, one];
-    auto as = a.sbinSerialize;
+    const as = a.sbinSerialize;
 
     auto b = as.sbinDeserialize!(typeof(a));
     assert(equal(a, b));
@@ -216,7 +216,7 @@ unittest
     enum T { one="one", two="2", three="III" }
     T[] a;
     with(T) a = [one, two, three, two, three, two, one];
-    auto as = a.sbinSerialize;
+    const as = a.sbinSerialize;
 
     assert(as.length == 7 + 1);
 
@@ -226,10 +226,10 @@ unittest
 
 unittest
 {
-    int ai = 543;
+    const int ai = 543;
     auto as = "hello";
 
-    import std.typecons;
+    import std.typecons : tuple;
     auto buf = sbinSerialize(tuple(ai, as));
 
     int bi;
@@ -242,7 +242,7 @@ unittest
 
 unittest
 {
-    int ai = 543;
+    const int ai = 543;
     auto as = "hello";
 
     auto buf = appender!(ubyte[]);
@@ -331,8 +331,6 @@ unittest
 
     ubyte[300] bdata;
     auto buffer = Buffer(bdata[]);
-
-    ubyte[] sdata;
 
     () @nogc { buffer.sbinSerialize(lines); }();
 
@@ -465,10 +463,10 @@ unittest
     }
 
     auto arr = cast(ubyte[])[1,2,3,4,5,6];
-    auto foo = Foo(arr, arr[0..2]);
+    const foo = Foo(arr, arr[0..2]);
     assert (foo.a.ptr == foo.b.ptr);
     
-    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
+    const foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
     assert(foo == foo2);
     assert(foo.a.ptr != foo2.a.ptr);
     assert(foo.b.ptr != foo2.b.ptr);
@@ -502,7 +500,7 @@ unittest
 
 unittest
 {
-    import std.variant;
+    import std.variant : Algebraic;
 
     struct Foo
     {
@@ -532,8 +530,8 @@ unittest
     u.ival = 114;
     assert (u.ival == 114);
 
-    auto su = u.sbinSerialize.sbinDeserialize!Union;
-    assert (u.ival == 114);
+    const su = u.sbinSerialize.sbinDeserialize!Union;
+    assert (su.ival == 114);
 }
 
 unittest
@@ -567,7 +565,7 @@ unittest
     auto data = buf.data;
 
     auto dsfoo1 = sbinDeserializePart!Foo1(data);
-    auto dsfoo2 = sbinDeserializePart!Foo2(data);
+    const dsfoo2 = sbinDeserializePart!Foo2(data);
 
     assert (data.empty);
 
@@ -607,7 +605,7 @@ unittest
     }
     {
         bool throws;
-        try auto dsv = sbinDeserialize!(Point[2])(data[0..$-1]);
+        try const dsv = sbinDeserialize!(Point[2])(data[0..$-1]);
         catch (SBinDeserializeEmptyRangeException e)
         {
             throws = true;
@@ -617,7 +615,7 @@ unittest
     }
     {
         bool throws;
-        try auto dsv = sbinDeserialize!(Point[2])(data[0..$/2+1]);
+        try const dsv = sbinDeserialize!(Point[2])(data[0..$/2+1]);
         catch (SBinDeserializeEmptyRangeException e)
         {
             throws = true;
@@ -627,7 +625,7 @@ unittest
     }
     {
         bool throws;
-        try auto dsv = sbinDeserialize!(Point[2])(data[0..$/2-1]);
+        try const dsv = sbinDeserialize!(Point[2])(data[0..$/2-1]);
         catch (SBinDeserializeEmptyRangeException e)
         {
             throws = true;
@@ -649,7 +647,7 @@ unittest
 
     {
         bool throws;
-        try auto dsv = sbinDeserialize!(ushort[])(data[0..$-3]);
+        try const dsv = sbinDeserialize!(ushort[])(data[0..$-3]);
         catch (SBinDeserializeEmptyRangeException e)
         {
             throws = true;
@@ -660,7 +658,7 @@ unittest
 
     {
         bool throws;
-        try auto dsv = sbinDeserialize!(ushort[])(data[0..0]);
+        try const dsv = sbinDeserialize!(ushort[])(data[0..0]);
         catch (SBinDeserializeEmptyRangeException e)
         {
             throws = true;
@@ -677,8 +675,7 @@ unittest
     assert (rng.length == 1);
     assert (rng[0] == 0);
 
-    auto des = sbinDeserialize!(short[])(rng);
-    assert (des.length == 0);
+    assert (sbinDeserialize!(short[])(rng).length == 0);
 }
 
 unittest
@@ -691,8 +688,7 @@ unittest
     assert (rng[2] == 4);
     assert (rng[3] == 6);
 
-    auto des = sbinDeserialize!(typeof(value))(rng);
-    assert (value == des);
+    assert (value ==  sbinDeserialize!(typeof(value))(rng));
 }
 
 unittest
@@ -705,8 +701,7 @@ unittest
     //assert (rng[2] == 4);
     assert (rng[4] == 6);
 
-    auto des = sbinDeserialize!(typeof(value))(rng);
-    assert (value == des);
+    assert (value ==  sbinDeserialize!(typeof(value))(rng));
 }
 
 unittest
@@ -719,6 +714,5 @@ unittest
     assert (rng[2] == 2);
     assert (rng[3] == 3);
 
-    auto des = sbinDeserialize!(typeof(value))(rng);
-    assert (value == des);
+    assert (value == sbinDeserialize!(typeof(value))(rng));
 }

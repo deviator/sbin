@@ -1,3 +1,4 @@
+///
 module sbin.serialize;
 
 import std.array : appender;

@@ -1,3 +1,4 @@
+///
 module sbin.type;
 
 package import std.traits;
@@ -5,16 +6,20 @@ package import std.range;
 
 import std.bitmanip : nativeToLittleEndian, littleEndianToNative;
 
+/// variable length uint
 struct vluint
 {
+    ///
     ulong value;
-    alias value this;
+    alias value this; ///
 }
 
+/// variable length int
 struct vlint
 {
+    ///
     long value;
-    alias value this;
+    alias value this; ///
 }
 
 package alias pack = nativeToLittleEndian;
