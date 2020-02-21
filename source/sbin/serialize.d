@@ -13,7 +13,7 @@ import sbin.zigzag;
         val - serializible value
         r - output range
 +/
-void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
+void sbinSerialize(R, Ts...)(auto ref R r, auto ref const Ts vals)
     if (isOutputRange!(R, ubyte) && Ts.length)
 {
     static if (Ts.length == 1)
@@ -40,7 +40,7 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         {
             static if (isDynamicArray!T)
                 dumpVLUInt(r, val.length);
-            put(r, cast(ubyte[])val[]);
+            put(r, (() @trusted => cast(ubyte[])val[])());
         }
         else static if (isStaticArray!T)
         {
@@ -50,7 +50,7 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         else static if (isSomeString!T)
         {
             dumpVLUInt(r, val.length);
-            put(r, cast(ubyte[])val);
+            put(r, (() @trusted => cast(ubyte[])val)());
         }
         else static if (isDynamicArray!T)
         {
@@ -82,6 +82,7 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         }
         else static if (hasCustomRepr!T)
         {
+            // for @safe sbinSerialize sbinCustomRepr must be @trusted or @safe
             sbinSerialize(r, val.sbinCustomRepr());
         }
         else static if (is(T == struct))
@@ -91,7 +92,7 @@ void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals)
         }
         else static if (is(T == union))
         {
-            sbinSerialize(r, cast(void[T.sizeof])((cast(void*)&val)[0..T.sizeof]));
+            sbinSerialize(r, (() @trusted => cast(void[T.sizeof])((cast(void*)&val)[0..T.sizeof]))());
         }
         else static assert(0, "unsupported type: " ~ T.stringof);
     }

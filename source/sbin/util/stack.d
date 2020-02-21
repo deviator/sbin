@@ -1,6 +1,7 @@
 module sbin.util.stack;
 
-pragma(msg, "\x1b[0;30;43m", __FILE__,":",__LINE__+3, " TODO chage to private", "\x1b[0m");
+package(sbin):
+
 struct Stack(T, size_t N=0)
 {
     //private

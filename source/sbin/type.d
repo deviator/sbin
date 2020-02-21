@@ -86,6 +86,13 @@ template EnumNumType(T) if (is(T == enum))
 
 unittest
 {
+    enum E { e }
+    static assert(is(E == enum));
+    static assert(is(EnumNumType!E == ubyte));
+}
+
+unittest
+{
     enum Color
     {
         black = "#000000",

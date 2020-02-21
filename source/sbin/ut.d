@@ -9,40 +9,51 @@ import sbin.deserialize;
 
 version (unittest) import std.algorithm : equal;
 
-unittest
+@safe unittest
 {
     const a = 123;
     assert(a.sbinSerialize.sbinDeserialize!int == a);
 }
 
-unittest
+@safe unittest
 {
-    auto a = 123;
+    enum V { v }
+    const a = V.v;
+    static assert(is(V == enum));
+    static assert(is(EnumNumType!V == ubyte));
+    const s = a.sbinSerialize;
+    assert (s.length == 1);
+    assert(s.sbinDeserialize!V == a);
+}
+
+@safe unittest
+{
+    const a = 123;
     auto as = a.sbinSerialize;
     int x;
     sbinDeserialize(as, x);
     assert(a == x);
 }
 
-unittest
+@safe unittest
 {
     auto s = "hello world";
     assert(equal(s.sbinSerialize.sbinDeserialize!string, s));
 }
 
-unittest
+@safe unittest
 {
     immutable(int[]) a = [1,2,3,2,3,2,1];
     assert(a.sbinSerialize.sbinDeserialize!(int[]) == a);
 }
 
-unittest
+@safe unittest
 {
     const int[5] a = [1,2,3,2,3];
     assert(a.sbinSerialize.sbinDeserialize!(typeof(a)) == a);
 }
 
-unittest
+@safe unittest
 {
     enum Color
     {
@@ -123,7 +134,7 @@ unittest
     assert(!equal(sdata.sbinDeserialize!(Bar[]), data));
 }
 
-unittest
+@safe unittest
 {
     static void foo(int a=123, string b="hello")
     { assert(a==123); assert(b=="hello"); }
@@ -148,7 +159,7 @@ unittest
     assert(b[1] == "okda");
 }
 
-unittest
+@safe unittest
 {
     auto a = [1,2,3,4];
     auto as = a.sbinSerialize;
@@ -156,7 +167,7 @@ unittest
     assertThrown!SBinDeserializeEmptyRangeException(as_tr.sbinDeserialize!(typeof(a)));
 }
 
-unittest
+@safe unittest
 {
     auto a = [1,2,3,4];
     auto as = a.sbinSerialize;
@@ -164,7 +175,7 @@ unittest
     assertThrown!SBinDeserializeException(as_tr.sbinDeserialize!(typeof(a)));
 }
 
-unittest
+@safe unittest
 {
     auto a = ["hello" : 123, "ok" : 43];
     auto as = a.sbinSerialize;
@@ -200,7 +211,7 @@ unittest
     assert(equal(sort(b.one.values.dup), sort(c.one.values.dup)));
 }
 
-unittest
+@safe unittest
 {
     enum T { one, two, three }
     T[] a;
@@ -211,7 +222,7 @@ unittest
     assert(equal(a, b));
 }
 
-unittest
+@safe unittest
 {
     enum T { one="one", two="2", three="III" }
     T[] a;
@@ -224,7 +235,7 @@ unittest
     assert(equal(a, b));
 }
 
-unittest
+@safe unittest
 {
     const int ai = 543;
     auto as = "hello";
@@ -240,7 +251,7 @@ unittest
     assert(bs == as);
 }
 
-unittest
+@safe unittest
 {
     const int ai = 543;
     auto as = "hello";
@@ -256,7 +267,7 @@ unittest
     assert(bs == as);
 }
 
-unittest
+@safe unittest
 {
     static struct ImplaceAppender(Arr)
     {
@@ -337,7 +348,7 @@ unittest
     assert(equal(buffer.data.sbinDeserialize!(typeof(lines)), lines));
 }
 
-unittest
+@safe unittest
 {
     static bool ser, deser;
     static struct Foo
@@ -362,19 +373,19 @@ unittest
     assert(deser);
 }
 
-unittest
+@safe unittest
 {
     static bool ser, deser;
     static class Foo
     {
         ulong id;
-        this(ulong v) { id = v; }
-        ulong sbinCustomRepr() const
+        this(ulong v) @safe { id = v; }
+        ulong sbinCustomRepr() const @safe
         {
             ser = true;
             return id;
         }
-        static Foo sbinFromCustomRepr()(auto ref const ulong v)
+        static Foo sbinFromCustomRepr()(auto ref const ulong v) @safe
         {
             deser = true;
             return new Foo(v);
@@ -397,7 +408,7 @@ unittest
     assert(equal(fooArr.map!"a.id", fooArr2.map!"a.id"));
 }
 
-unittest
+@safe unittest
 {
     // for classes need
     // T sbinCustomRepr() const
@@ -414,7 +425,7 @@ unittest
     static assert(!is(typeof(foo.sbinSerialize.sbinDeserialize!Foo.id)));
 }
 
-unittest
+@safe unittest
 {
     import std.bitmanip : bitfields;
 
@@ -455,7 +466,7 @@ unittest
     assert(foo == bar);
 }
 
-unittest
+@safe unittest
 {
     struct Foo
     {
@@ -514,7 +525,7 @@ unittest
     static assert(!__traits(compiles, foo.sbinSerialize.sbinDeserialize!Foo));
 }
 
-unittest
+@safe unittest
 {
     import std.algorithm : max;
 
@@ -577,7 +588,7 @@ unittest
     assert(dsfoo2.d == 3);
 }
 
-unittest
+@safe unittest
 {
     enum Label { good, bad }
     static struct Pos { int x, y; }
@@ -635,7 +646,7 @@ unittest
     }
 }
 
-unittest
+@safe unittest
 {
     ushort[] val = [10,12,14,15];
 
@@ -668,7 +679,7 @@ unittest
     }
 }
 
-unittest
+@safe unittest
 {
     short[] value;
     auto rng = sbinSerialize(value);
@@ -678,7 +689,7 @@ unittest
     assert (sbinDeserialize!(short[])(rng).length == 0);
 }
 
-unittest
+@safe unittest
 {
     vlint[] value = [vlint(1),vlint(2),vlint(3)];
     auto rng = sbinSerialize(value);
@@ -691,7 +702,7 @@ unittest
     assert (value ==  sbinDeserialize!(typeof(value))(rng));
 }
 
-unittest
+@safe unittest
 {
     vlint[] value = [vlint(1),vlint(-130),vlint(3)];
     auto rng = sbinSerialize(value);
@@ -704,7 +715,7 @@ unittest
     assert (value ==  sbinDeserialize!(typeof(value))(rng));
 }
 
-unittest
+@safe unittest
 {
     vluint[] value = [vluint(1),vluint(2),vluint(3)];
     auto rng = sbinSerialize(value);

@@ -127,7 +127,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
                 if (trg.length != l) trg.length = l;
             }
 
-            auto tmp = cast(ubyte[])trg[];
+            auto tmp = (() @trusted => cast(ubyte[])trg[])();
             foreach (i, ref v; tmp) impl(r, v, "elem", i);
         }
         else static if (isStaticArray!T)
@@ -144,7 +144,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
             auto tmp = new ubyte[](len);
             foreach (i, ref v; tmp)
                 v = pop(r, "elem", i, T.stringof, i, len);
-            trg = cast(T)tmp;
+            trg = (() @trusted => cast(T)tmp)();
         }
         else static if (isDynamicArray!T)
         {
@@ -165,7 +165,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
                 return cast(size_t)readVLUInt(r);
             })();
 
-            trg.clear();
+            (() @trusted => trg.clear())();
 
             foreach (i; 0 .. len)
             {
@@ -176,7 +176,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
                 trg[k] = v;
             }
 
-            trg.rehash();
+            (() @trusted => trg.rehash())();
         }
         else static if (isTagged!(T).any)
         {
@@ -203,6 +203,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         {
             ReturnType!(trg.sbinCustomRepr) tmp;
             impl(r, tmp, "customRepr");
+            // for @safe sbinDeserialize sbinFromCustomRepr must be @trusted or @safe
             trg = T.sbinFromCustomRepr(tmp);
         }
         else static if (is(T == struct))
@@ -212,7 +213,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         }
         else static if (is(T == union))
         {
-            auto tmp = cast(ubyte[])((cast(void*)&trg)[0..T.sizeof]);
+            auto tmp = (() @trusted => cast(ubyte[])((cast(void*)&trg)[0..T.sizeof]))();
             foreach (i, ref v; tmp)
                 v = pop(r, "byte", i, T.stringof, i, T.sizeof);
         }
@@ -221,7 +222,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
 
     size_t cnt;
 
-    auto wr = WrapRng(&range, &cnt, &fNameStack);
+    auto wr = (() @trusted => WrapRng(&range, &cnt, &fNameStack))();
 
     static if (Target.length == 1)
         impl(wr, target[0], "root");

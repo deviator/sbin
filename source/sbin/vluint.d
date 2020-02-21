@@ -23,6 +23,7 @@ version (unittest)
     import std.exception : enforce;
 }
 
+@safe
 unittest
 {
     auto buf = appender!(ubyte[]);
@@ -72,8 +73,16 @@ unittest
 }
 
 ///
-ulong readVLUInt(R)(auto ref R r, int* count=null) //if (isInputRange!(R, ubyte))
+ulong readVLUInt(R)(auto ref R r)
     if (is(typeof(r.front()) == ubyte) && is(typeof(r.popFront())))
+{
+    uint count;
+    return readVLUInt(r, count);
+}
+
+///
+ulong readVLUInt(R, T)(auto ref R r, out T count) //if (isInputRange!(R, ubyte))
+    if (is(typeof(r.front()) == ubyte) && is(typeof(r.popFront())) && is(T : size_t))
 {
     immutable mask = 0b0111_1111uL;
     immutable flag = 0b1000_0000uL;
@@ -88,13 +97,14 @@ ulong readVLUInt(R)(auto ref R r, int* count=null) //if (isInputRange!(R, ubyte)
         ret += (v & mask) << (b++ * 7);
         if (!(v & flag))
         {
-            if (count !is null) *count = b;
+            count = b;
             return ret;
         }
         if (b > 10) throw new Exception("so many data for one ulong value");
     }
 }
 
+@safe
 unittest
 {
     foreach (ubyte i; 0 .. 128)
@@ -103,10 +113,11 @@ unittest
         assert(readVLUInt(buf) == i);
     }
 
+    @safe
     void test(ulong val, ubyte[] need, string file=__FILE__, size_t line=__LINE__)
     {
         int cnt;
-        auto readed = readVLUInt(need.dup, &cnt);
+        auto readed = readVLUInt(need.dup, cnt);
         //import std.stdio;
         //stderr.writeln(cnt, " ", need.length);
         //stderr.writeln(val, " ", readed, " ", val-readed);
@@ -135,6 +146,7 @@ unittest
     test(ulong.max-2, [b-2,b,b, b,b,b, b,b,b, 1]);
 }
 
+@safe
 unittest
 {
     static struct StaticBuffer(size_t N)
