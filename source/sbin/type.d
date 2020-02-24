@@ -6,19 +6,23 @@ package import std.range;
 
 import std.bitmanip : nativeToLittleEndian, littleEndianToNative;
 
+import sbin.repr;
+
 /// variable length uint
 struct vluint
 {
+    ulong value; ///
     ///
-    ulong value;
+    this()(ulong v) { value = v; }
     alias value this; ///
 }
 
 /// variable length int
 struct vlint
 {
+    long value; ///
     ///
-    long value;
+    this()(long v) { value = v; }
     alias value this; ///
 }
 
@@ -147,7 +151,7 @@ unittest
 }
 
 ///
-template hasCustomRepr(T)
+template hasCustomRepr(T, RH=EmptyReprHandler)
 {
     static if (hasMember!(T, "sbinCustomRepr") && hasMember!(T, "sbinFromCustomRepr"))
     {
@@ -155,7 +159,7 @@ template hasCustomRepr(T)
 
         alias Repr = ReturnType!(() => T.init.sbinCustomRepr);
 
-        enum hasCustomRepr = is(typeof(sbinSerialize(Repr.init))) && 
+        enum hasCustomRepr = is(typeof(sbinSerialize!RH(Repr.init))) && 
                 is(typeof(((){ return T.sbinFromCustomRepr(Repr.init); })()) == Unqual!T);
     }
     else enum hasCustomRepr = false;

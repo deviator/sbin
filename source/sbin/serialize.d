@@ -6,6 +6,7 @@ import std.array : appender;
 import sbin.type;
 import sbin.vluint;
 import sbin.zigzag;
+import sbin.repr;
 
 /++ Serialize to output ubyte range
 
@@ -13,14 +14,19 @@ import sbin.zigzag;
         val - serializible value
         r - output range
 +/
-void sbinSerialize(R, Ts...)(auto ref R r, auto ref const Ts vals)
-    if (isOutputRange!(R, ubyte) && Ts.length)
+void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const Ts vals)
+    if (isOutputRange!(R, ubyte) && Ts.length && isReprHandler!RH)
 {
     static if (Ts.length == 1)
     {
         alias T = Unqual!(Ts[0]);
         alias val = vals[0];
-        static if (is(T == enum))
+
+        static if (hasRepr!(RH, T))
+        {
+            sbinSerialize!RH(r, RH.repr(val));
+        }
+        else static if (is(T == enum))
         {
             put(r, getEnumNum(val).pack[]);
         }
@@ -45,7 +51,7 @@ void sbinSerialize(R, Ts...)(auto ref R r, auto ref const Ts vals)
         else static if (isStaticArray!T)
         {
             foreach (ref v; val)
-                sbinSerialize(r, v);
+                sbinSerialize!RH(r, v);
         }
         else static if (isSomeString!T)
         {
@@ -56,47 +62,47 @@ void sbinSerialize(R, Ts...)(auto ref R r, auto ref const Ts vals)
         {
             dumpVLUInt(r, val.length);
             foreach (ref v; val)
-                sbinSerialize(r, v);
+                sbinSerialize!RH(r, v);
         }
         else static if (isAssociativeArray!T)
         {
             dumpVLUInt(r, val.length);
             foreach (k, ref v; val)
             {
-                sbinSerialize(r, k);
-                sbinSerialize(r, v);
+                sbinSerialize!RH(r, k);
+                sbinSerialize!RH(r, v);
             }
         }
         else static if (isTagged!(T).any)
         {
-            sbinSerialize(r, val.kind);
+            sbinSerialize!RH(r, val.kind);
             FS: final switch (val.kind)
             {
                 static foreach (k; EnumMembers!(T.Kind))
                 {
                     case k:
-                        sbinSerialize(r, cast(const(TypeOf!k))val);
+                        sbinSerialize!RH(r, cast(const(TypeOf!k))val);
                         break FS;
                 }
             }
         }
-        else static if (hasCustomRepr!T)
+        else static if (hasCustomRepr!(T, RH))
         {
             // for @safe sbinSerialize sbinCustomRepr must be @trusted or @safe
-            sbinSerialize(r, val.sbinCustomRepr());
+            sbinSerialize!RH(r, val.sbinCustomRepr());
         }
         else static if (is(T == struct))
         {
             foreach (ref v; val.tupleof)
-                sbinSerialize(r, v);
+                sbinSerialize!RH(r, v);
         }
         else static if (is(T == union))
         {
-            sbinSerialize(r, (() @trusted => cast(void[T.sizeof])((cast(void*)&val)[0..T.sizeof]))());
+            sbinSerialize!RH(r, (() @trusted => cast(void[T.sizeof])((cast(void*)&val)[0..T.sizeof]))());
         }
         else static assert(0, "unsupported type: " ~ T.stringof);
     }
-    else foreach (ref v; vals) sbinSerialize(r, v);
+    else foreach (ref v; vals) sbinSerialize!RH(r, v);
 }
 
 /++ Serialize to ubyte[]
@@ -109,9 +115,9 @@ void sbinSerialize(R, Ts...)(auto ref R r, auto ref const Ts vals)
     Returns:
         serialized data
 +/
-ubyte[] sbinSerialize(T)(auto ref const T val)
+ubyte[] sbinSerialize(RH=EmptyReprHandler, T)(auto ref const T val) if (isReprHandler!RH)
 {
     auto buf = appender!(ubyte[]);
-    sbinSerialize(buf, val);
+    sbinSerialize!RH(buf, val);
     return buf.data;
 }

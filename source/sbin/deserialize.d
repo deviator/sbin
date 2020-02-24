@@ -7,6 +7,7 @@ import sbin.type;
 import sbin.vluint;
 import sbin.zigzag;
 import sbin.exception;
+import sbin.repr;
 
 /++ Deserialize part of input ragne to `Target` value
 
@@ -14,8 +15,8 @@ import sbin.exception;
         range = input range with serialized data (not saved before work)
         target = reference to result object
  +/
-void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
-    if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte))
+void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Target target)
+    if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte) && isReprHandler!RH)
 {
     import sbin.util.stack : Stack;
 
@@ -88,10 +89,17 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
         return ret;
     }
 
-    auto impl(T)(ref WrapRng r, ref T trg, string field, ptrdiff_t idx=-1)
+    void impl(T)(ref WrapRng r, ref T trg, string field, ptrdiff_t idx=-1)
     {
         const __ = StackHolder(field, idx);
-        static if (is(T == enum))
+
+        static if (hasRepr!(RH, T))
+        {
+            serializeRepr!(RH, T) repr;
+            impl(r, repr, "repr");
+            trg = RH.fromRepr(repr);
+        }
+        else static if (is(T == enum))
         {
             immutable EM = [EnumMembers!T];
             alias ENT = EnumNumType!T;
@@ -199,7 +207,7 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
                 }
             }
         }
-        else static if (hasCustomRepr!T)
+        else static if (hasCustomRepr!(T, RH))
         {
             ReturnType!(trg.sbinCustomRepr) tmp;
             impl(r, tmp, "customRepr");
@@ -238,10 +246,19 @@ void sbinDeserializePart(R, Target...)(ref R range, ref Target target)
     Returns:
         deserialized value
  +/
+Target sbinDeserializePart(RH=EmptyReprHandler, Target, R)(ref R range)
+    if (isReprHandler!RH)
+{
+    Unqual!Target ret;
+    sbinDeserializePart!RH(range, ret);
+    return ret;
+}
+
+/// ditto
 Target sbinDeserializePart(Target, R)(ref R range)
 {
     Unqual!Target ret;
-    sbinDeserializePart(range, ret);
+    sbinDeserializePart!EmptyReprHandler(range, ret);
     return ret;
 }
 
@@ -253,10 +270,19 @@ Target sbinDeserializePart(Target, R)(ref R range)
     Returns:
         deserialized value
  +/
+Target sbinDeserialize(RH=EmptyReprHandler, Target, R)(R range)
+    if (isReprHandler!RH)
+{
+    Unqual!Target ret;
+    sbinDeserialize!RH(range, ret);
+    return ret;
+}
+
+/// ditto
 Target sbinDeserialize(Target, R)(R range)
 {
     Unqual!Target ret;
-    sbinDeserialize(range, ret);
+    sbinDeserialize!EmptyReprHandler(range, ret);
     return ret;
 }
 
@@ -269,9 +295,10 @@ Target sbinDeserialize(Target, R)(R range)
     Throws:
         SBinDeserializeException if range isn't empty after deseriazlie
  +/
-void sbinDeserialize(R, Target...)(R range, ref Target target)
+void sbinDeserialize(RH=EmptyReprHandler, R, Target...)(R range, ref Target target)
+    if (isReprHandler!RH)
 {
-    sbinDeserializePart(range, target);
+    sbinDeserializePart!RH(range, target);
 
     enforce(range.empty, new SBinDeserializeException(
         format("input range not empty after full '%s' deserialize", Target.stringof)));

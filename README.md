@@ -75,8 +75,9 @@ const foo1 = Foo(10, 3.14, 2.17, 8, "s1", Color.red);
 
 //                 a              b            c       d
 const foo1Size = ulong.sizeof + float.sizeof * 2 + ushort.sizeof +
-//                      str                      color
-        (length_t.sizeof + foo1.str.length) + ubyte.sizeof;
+//         str                      color
+        (1 + foo1.str.length) + ubyte.sizeof;
+// length of dynamic arrays packed to variable length uint
 
 // color is ubyte because [EnumMembers!Color].length < ubyte.max
 
@@ -90,7 +91,7 @@ assert(foo1Data.sbinDeserialize!Foo == foo1);
 const foo2 = Foo(2, 2.22, 2.22, 2, "str2", Color.green);
 
 const foo2Size = ulong.sizeof + float.sizeof * 2 + ushort.sizeof +
-        (length_t.sizeof + foo2.str.length) + ubyte.sizeof;
+                    (1 + foo2.str.length) + ubyte.sizeof;
 
 enum Level { low, medium, high }
 
@@ -106,11 +107,18 @@ auto bar = Bar(123, 3.14, Level.high, [ foo1, foo2 ]);
 
 //                   a               b          level
 const barSize = ulong.sizeof + float.sizeof + ubyte.sizeof +
-//                                 foos
-                (length_t.sizeof + foo1Size + foo2Size);
+//                           foos
+                (ubyte.sizeof + foo1Size + foo2Size);
 
 assert(bar.sbinSerialize.length == barSize);
 ```
+
+### Variable length integers
+
+You can use `vlint` and `vluint`. They are `long` and `ulong` under the
+hood. Minimal count of bytes that they need is 1: for `vlint` it will be
+for values `[-63, 64]`, for `vluint` for `[0, 127]`. Maximum count of
+bytes is 10 for values near the limit of `long` and `ulong`.
 
 ### Custom [de]serialization algorithm
 
@@ -118,18 +126,65 @@ Add to your type `Foo`:
 
 * `T sbinCustomRepr() @property const` where `T` is serializable representation
   of `Foo`, what can be used for full restore data
-* `static Foo sbinFromCustomRepr(auto ref const T repr)` what returns is new
+* `static Foo sbinFromCustomRepr()(auto ref const T repr)` what returns is new
   instance for your deserialization type
 
 ### TaggedAlgebraic
 
 See [example](example/app.d).
 
+### Types that can't be changed
+
+For example `std.bitmanip.BitArray` has pointer, `std.datetime.SysTime` has 
+class field `TimeZone`. They can't be serialized automaticaly.
+For solving this problem you can use representation handlers.
+
+Representation handler is simple struct with `sbinReprHandler` enum field and
+static methods, two methods for one wrapped type: `repr` for get
+representation, `fromRepr` for get original type.
+
+Example:
+```d
+struct RH
+{
+    // need for detecting representation handlers
+    enum sbinReprHandler;
+
+static:
+
+    // representation must can be [de]serialized
+    static struct BAW { vluint bc; void[] data; }
+
+    // this method must get const original value
+    BAW repr(const BitArray ba) { return BAW(vluint(ba.length), cast(void[])ba.dup); }
+    BitArray fromRepr(BAW w) { return BitArray(w.data.dup, w.bc); }
+
+    long repr(const SysTime t) { return t.toUTC.stdTime; }
+    SysTime fromRepr(long r) { return SysTime(r, UTC()); }
+}
+
+struct Foo
+{
+    string name;
+    BitArray bits;
+    SysTime tm;
+}
+
+auto foo = Foo("bar", BitArray([1,0,1]), Clock.currTime);
+
+const foo_bytes = sbinSerialize!RH(foo);
+
+auto foo2 = sbinDeserialize!(RH, Foo)(foo_bytes);
+
+assert (foo == foo2);
+```
+
 ## Limitations
 
 ### Unions
 
-Unions serializes/deserializes as static byte array without analyze elements (size of union is size of max element).
+Unions serializes/deserializes as static byte array without analyze elements
+(size of union is size of max element).
 
 **If you want use arrays or strings in unions you must implement custom [de]serialize methods or use `TaggedAlgebraic`**
 
@@ -137,17 +192,18 @@ Unions serializes/deserializes as static byte array without analyze elements (si
 
 Not supported. See [TaggedAlgebraic](#taggedalgebraic) if you need variablic types.
 
-### Max dynamic array length
+### Pointers
 
-By default uses `uint` as `length_t`, for using `ulong` use library cofiguration `ulong_length`.
+Can't automatic [de]serialize pointers data. For arrays use builtin arrays.
+For struct and class types see custom serialization.
 
 ### Code versions
 
 If you want use sbin for message passing between applications you
-must use strictly identical types (one source code), because struct fields are not marked 
-(deserialization relies solely on information from type) and any change in code
-(swap fields, change fields type, change enum values list) must be accompanied by
-recompilation of all applications.
+must use strictly identical types (one source code), because struct fields
+are not marked (deserialization relies solely on information from type)
+and any change in code (swap fields, change fields type, change enum values
+list) must be accompanied by recompilation of all applications.
 
 ### Immutable and const
 

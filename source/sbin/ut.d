@@ -80,7 +80,7 @@ version (unittest) import std.algorithm : equal;
     //                  a              b         c       d
     const foo1Size = ulong.sizeof + float.sizeof * 2 + ushort.sizeof +
     //                            str                      color
-            (1 /+length_t.sizeof+/ + foo1.str.length) + ubyte.sizeof; // 1 is length data because length < 127 (vluint pack)
+            (1 + foo1.str.length) + ubyte.sizeof; // 1 is length data because length < 127 (vluint pack)
 
     // color is ubyte because [EnumMembers!Color].length < ubyte.max
 
@@ -726,4 +726,85 @@ unittest
     assert (rng[3] == 3);
 
     assert (value == sbinDeserialize!(typeof(value))(rng));
+}
+
+unittest
+{
+    import std.bitmanip;
+    import std : uniform, iota, map, array;
+
+    BitArray b = iota(273).map!(a=>cast(bool)uniform!"[]"(0,1)).array;
+
+    static struct BitArrayWrap
+    {
+        BitArray arr;
+        this(BitArray a) { arr = a; }
+        this(Repr r) { arr = BitArray(r.data, r.bitcount); }
+
+        static struct Repr
+        {
+            vluint bitcount;
+            void[] data;
+        }
+
+        Repr sbinCustomRepr() @property const
+        { return Repr(vluint(arr.length), cast(void[])arr.dup); }
+
+        static BitArrayWrap sbinFromCustomRepr(Repr r)
+        { return BitArrayWrap(r); }
+    }
+
+    const t1 = sbinDeserialize!BitArrayWrap(sbinSerialize(BitArrayWrap(b))).arr;
+
+    assert (b == t1);
+
+    static struct BitArrayWrap2
+    {
+        vluint bitcount;
+        void[] data;
+
+        this(BitArray ba) { bitcount = ba.length; data = cast(void[])ba; }
+    }
+
+    const pft2 = sbinDeserialize!BitArrayWrap2(sbinSerialize(BitArrayWrap2(b)));
+
+    const t2 = BitArray(pft2.data.dup, pft2.bitcount);
+
+    assert (b == t2);
+
+    import std.datetime;
+
+    static struct RH
+    {
+        enum sbinReprHandler;
+    static:
+        static struct BAW3 { vluint bc; void[] data; }
+        BAW3 repr(const BitArray ba) { return BAW3(vluint(ba.length), cast(void[])ba.dup); }
+        BitArray fromRepr(BAW3 w) { return BitArray(w.data.dup, w.bc); }
+
+        long repr(const SysTime t) { return t.toUTC.stdTime; }
+        SysTime fromRepr(long r) { return SysTime(r, UTC()); }
+    }
+
+    auto t3 = sbinDeserialize!(RH, BitArray)(sbinSerialize!RH(b));
+
+    assert (b == t3);
+
+    struct Foo
+    {
+        string name;
+        BitArray data;
+        SysTime tm;
+    }
+
+    auto foo = Foo("hello", b, Clock.currTime);
+
+    const foo_bytes = sbinSerialize!RH(foo);
+
+    auto foo2 = sbinDeserialize!(RH, Foo)(foo_bytes);
+
+    assert (foo.name == foo2.name);
+    assert (foo.data == foo2.data);
+    assert (foo.tm == foo2.tm);
+    assert (foo == foo2);
 }
