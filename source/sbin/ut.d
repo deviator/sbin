@@ -731,7 +731,10 @@ unittest
 unittest
 {
     import std.bitmanip;
-    import std : uniform, iota, map, array;
+    import std.random : uniform;
+    import std.range : iota;
+    import std.algorithm : map;
+    import std.array : array;
 
     BitArray b = iota(273).map!(a=>cast(bool)uniform!"[]"(0,1)).array;
 

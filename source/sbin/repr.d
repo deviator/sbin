@@ -1,6 +1,6 @@
 module sbin.repr;
 
-import std : Unqual;
+import std.traits : Unqual;
 
 import sbin.serialize;
 import sbin.deserialize;
