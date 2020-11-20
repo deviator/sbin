@@ -93,8 +93,10 @@ void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const T
         }
         else static if (is(T == struct))
         {
-            foreach (ref v; val.tupleof)
-                sbinSerialize!RH(r, v);
+            import std.traits : hasUDA;
+            foreach (i, ref v; val.tupleof)
+                static if (!hasUDA!(T.tupleof[i], SBinSkip))
+                    sbinSerialize!RH(r, v);
         }
         else static if (is(T == union))
         {
