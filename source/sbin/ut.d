@@ -73,7 +73,7 @@ version (unittest) import std.algorithm : equal;
         ushort d;
         string str;
         Color color;
-        @SBinSkip int local = 42;
+        @sbinSkip int local = 42;
     }
     
     const foo1 = Foo(10, 3.14, 2.17, 8, "s1", Color.red);
@@ -139,7 +139,7 @@ version (unittest) import std.algorithm : equal;
 {
     struct S
     {
-        @SBinSkip int* p;
+        @sbinSkip int* p;
     }
 
     auto s1 = S(new int(42));

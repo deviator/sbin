@@ -68,7 +68,7 @@ struct Foo
     ushort d;
     string str;
     Color color;
-    @SBinSkip int local = 42;
+    @sbinSkip int local = 42;
 }
 
 const foo1 = Foo(10, 3.14, 2.17, 8, "s1", Color.red);
@@ -115,7 +115,7 @@ assert(bar.sbinSerialize.length == barSize);
 
 ### Skipping fields
 
-If a field in a struct has the `@SBinSkip` attribute, the field will
+If a field in a struct has the `@sbinSkip` attribute, the field will
 not be serialized. Upon deserialization the field will have the value of
 the static initializer if there is one, or `.init` otherwise.
 
