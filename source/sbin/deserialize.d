@@ -216,8 +216,10 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
         }
         else static if (is(T == struct))
         {
+            import std.traits : hasUDA;
             foreach (i, ref v; trg.tupleof)
-                impl(r, v, __traits(identifier, trg.tupleof[i]));
+                static if (!hasUDA!(T.tupleof[i], sbinSkip))
+                    impl(r, v, __traits(identifier, trg.tupleof[i]));
         }
         else static if (is(T == union))
         {

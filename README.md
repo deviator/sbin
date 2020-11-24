@@ -46,7 +46,6 @@ Creates `Unqual!Target ret`, fill it and return.
 
 ### Key points
 
-* all struct fields are serialized and deserialized by default (no `ignore` or `serializeOnly` features)
 * only dynamic arrays (associative arrays too) has variable length, all other types has fixed size
 
 ### Example
@@ -69,6 +68,7 @@ struct Foo
     ushort d;
     string str;
     Color color;
+    @sbinSkip int local = 42;
 }
 
 const foo1 = Foo(10, 3.14, 2.17, 8, "s1", Color.red);
@@ -112,6 +112,12 @@ const barSize = ulong.sizeof + float.sizeof + ubyte.sizeof +
 
 assert(bar.sbinSerialize.length == barSize);
 ```
+
+### Skipping fields
+
+If a field in a struct has the `@sbinSkip` attribute, the field will
+not be serialized. Upon deserialization the field will have the value of
+the static initializer if there is one, or `.init` otherwise.
 
 ### Variable length integers
 

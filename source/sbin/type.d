@@ -8,6 +8,9 @@ import std.bitmanip : nativeToLittleEndian, littleEndianToNative;
 
 import sbin.repr;
 
+/// UDA for marking struct fields to be skipped.
+enum sbinSkip;
+
 /// variable length uint
 struct vluint
 {

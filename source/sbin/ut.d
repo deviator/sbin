@@ -73,6 +73,7 @@ version (unittest) import std.algorithm : equal;
         ushort d;
         string str;
         Color color;
+        @sbinSkip int local = 42;
     }
     
     const foo1 = Foo(10, 3.14, 2.17, 8, "s1", Color.red);
@@ -132,6 +133,22 @@ version (unittest) import std.algorithm : equal;
     assert( equal(sdata.sbinDeserialize!(Bar[]), data));
     data[0].foos[1].d = 12_345;
     assert(!equal(sdata.sbinDeserialize!(Bar[]), data));
+}
+
+@safe unittest
+{
+    struct S
+    {
+        @sbinSkip int* p;
+    }
+
+    auto s1 = S(new int(42));
+
+    auto data = s1.sbinSerialize;
+    assert(data.length == 0);
+
+    auto s2 = data.sbinDeserialize!S;
+    assert(s2.p == null);
 }
 
 @safe unittest
