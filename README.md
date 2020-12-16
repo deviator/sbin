@@ -197,7 +197,7 @@ Unions serializes/deserializes as static byte array without analyze elements
 
 ### std.variant
 
-Not supported. See [Tagged algebraics](#tagged_algebraics) if you need variablic types.
+Not supported. See [Tagged algebraics](#tagged-algebraics) if you need variablic types.
 
 ### Pointers
 
