@@ -135,9 +135,10 @@ Add to your type `Foo`:
 * `static Foo sbinFromCustomRepr()(auto ref const T repr)` what returns is new
   instance for your deserialization type
 
-### TaggedAlgebraic
+### Tagged algebraics
 
-See [example](example/app.d).
+See [`taggedalgebraic` example](example/taggedalgebraic_example.d) and 
+[`mir.algebraic` example](example/mir_algebraic_example.d).
 
 ### Types that can't be changed
 
@@ -192,11 +193,11 @@ assert (foo == foo2);
 Unions serializes/deserializes as static byte array without analyze elements
 (size of union is size of max element).
 
-**If you want use arrays or strings in unions you must implement custom [de]serialize methods or use `TaggedAlgebraic`**
+**If you want use arrays or strings in unions you must implement custom [de]serialize methods or use tagged algebraic**
 
 ### std.variant
 
-Not supported. See [TaggedAlgebraic](#taggedalgebraic) if you need variablic types.
+Not supported. See [Tagged algebraics](#tagged_algebraics) if you need variablic types.
 
 ### Pointers
 
