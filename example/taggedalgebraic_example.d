@@ -1,11 +1,15 @@
+/+ dub.sdl:
+    dependency "taggedalgebraic" version="~>0.11.18"
+    dependency "sbin" path=".."
++/
+
 import taggedalgebraic;
 import sbin;
 
-struct Foo {
-    string name;
-}
+struct Foo { string name; }
 
-union Base {
+union Base
+{
     int count;
     string str;
     Foo foo;

@@ -186,7 +186,7 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
 
             (() @trusted => trg.rehash())();
         }
-        else static if (isTagged!(T).any)
+        else static if (isTagged!T)
         {
             import std.algorithm.mutation : move;
 
@@ -194,15 +194,31 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
             impl(r, kind, "kind");
             FS: final switch (kind)
             {
-                static foreach (k; EnumMembers!(T.Kind))
+                static foreach (i, k; EnumMembers!(T.Kind))
                 {
                     case k:
-                        TypeOf!k tmp;
-                        impl(r, tmp, "value");
-                        static if (isTagged!(T).tUnion)
-                            trg.set!k(move(tmp));
+                        version (Have_taggedalgebraic)
+                        {
+                            TypeOf!k tmp;
+                            impl(r, tmp, "value");
+
+                            static if (is(T == TaggedUnion!S, S))
+                                trg.set!k(move(tmp));
+                            else
+                                trg = tmp;
+                        }
                         else
-                            trg = tmp;
+                        version (Have_mir_core)
+                        {
+                            T.AllowedTypes[i] tmp;
+                            impl(r, tmp, "value");
+
+                            static if (__traits(compiles, trg = tmp))
+                                trg = tmp;
+                            else
+                                trg.set!k(move(tmp));
+                        }
+
                         break FS;
                 }
             }

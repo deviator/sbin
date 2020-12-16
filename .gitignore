@@ -13,3 +13,7 @@ docs/
 *.o
 *.obj
 *.lst
+
+/example/*
+!/example/*.d
+dub.selections.json

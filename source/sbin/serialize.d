@@ -73,15 +73,20 @@ void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const T
                 sbinSerialize!RH(r, v);
             }
         }
-        else static if (isTagged!(T).any)
+        else static if (isTagged!T)
         {
             sbinSerialize!RH(r, val.kind);
             FS: final switch (val.kind)
             {
-                static foreach (k; EnumMembers!(T.Kind))
+                static foreach (i, k; EnumMembers!(T.Kind))
                 {
                     case k:
-                        sbinSerialize!RH(r, cast(const(TypeOf!k))val);
+                        version (Have_taggedalgebraic)
+                            sbinSerialize!RH(r, cast(const(TypeOf!k))val);
+                        else
+                        version (Have_mir_core)
+                            sbinSerialize!RH(r, val.get!(T.AllowedTypes[i]));
+
                         break FS;
                 }
             }

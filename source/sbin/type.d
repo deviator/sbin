@@ -39,21 +39,19 @@ package auto unpack(T, size_t N)(ubyte[N] arr)
 }
 
 version (Have_taggedalgebraic) package import taggedalgebraic;
+version (Have_mir_core) package import mir.algebraic;
 
 template isTagged(T)
 {
     version (Have_taggedalgebraic)
-    {
-        enum tUnion = is(T == TaggedUnion!X, X);
-        enum tAlgebraic = is(T == TaggedAlgebraic!X, X);
-        enum any = tUnion || tAlgebraic;
-    }
+        enum r = is(T == TaggedUnion!X, X) || is(T == TaggedAlgebraic!Y, Y);
     else
-    {
-        enum any = false;
-        enum tUnion = false;
-        enum tAlgebraic = false;
-    }
+    version (Have_mir_core)
+        enum r = isVariant!T;
+    else
+        enum r = false;
+
+    enum isTagged = r;
 }
 
 template isVoidArray(T)

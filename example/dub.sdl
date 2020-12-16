@@ -1,5 +1,0 @@
-name "example"
-dependency "taggedalgebraic" version="~>0.11.4"
-dependency "sbin" path=".."
-mainSourceFile "app.d"
-targetType "executable"
