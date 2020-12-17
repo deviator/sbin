@@ -1,9 +1,6 @@
 # Simple binary [de]serialize
 
-[![Build Status](https://travis-ci.org/deviator/sbin.svg?branch=master)](https://travis-ci.org/deviator/sbin)
-
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/deviator/sbin/base)](https://github.com/deviator/sbin/actions)
-
 [![codecov](https://codecov.io/gh/deviator/sbin/branch/master/graph/badge.svg)](https://codecov.io/gh/deviator/sbin)
 [![Dub](https://img.shields.io/dub/v/sbin.svg)](http://code.dlang.org/packages/sbin)
 [![License](https://img.shields.io/dub/l/sbin.svg)](http://code.dlang.org/packages/sbin)
