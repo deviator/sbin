@@ -7,12 +7,16 @@ d:
  - ldc
  - dmd
  - ldc-beta
+ - ldc-1.24.0
+ - ldc-1.23.0
+ - ldc-1.22.0
  - ldc-1.17.0
  - ldc-1.15.0
  - ldc-1.8.0
  - dmd-2.085.1
 script:
- - dub --root=example --compiler=${DC}
+ - dub --root=example --compiler=${DC} --single mir_algebraic_example.d
+ - dub --root=example --compiler=${DC} --single taggedalgebraic_example.d
  - dub test --compiler=${DC}
  - dub test --compiler=${DC} --build=unittest-cov
 after_success:
