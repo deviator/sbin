@@ -1,4 +1,4 @@
-name: Run all D Tests
+name: base
 on: [push]
 
 jobs:
