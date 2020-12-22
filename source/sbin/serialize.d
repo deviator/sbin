@@ -85,7 +85,11 @@ void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const T
                             sbinSerialize!RH(r, cast(const(TypeOf!k))val);
                         else
                         version (Have_mir_core)
-                            sbinSerialize!RH(r, val.get!(T.AllowedTypes[i]));
+                        {
+                            // do not try serialize null for nullable type
+                            static if (!is(T.AllowedTypes[i] == typeof(null)))
+                                sbinSerialize!RH(r, val.get!k);
+                        }
 
                         break FS;
                 }

@@ -9,6 +9,7 @@ import sbin;
 struct Foo { string name; }
 
 alias TUnion = Algebraic!(
+    TaggedType!(typeof(null), "nil"),
     TaggedType!(int, "count"),
     TaggedType!(string, "str"),
     TaggedType!(Foo, "foo"),
@@ -24,17 +25,18 @@ struct Bar
 
 void barTest()
 {
-    auto bar = Bar(4, [TUnion(42), TUnion("Hello"), TUnion(Foo("ABC"))]);
+    auto bar = Bar(77, [TUnion(42), TUnion("Hello"), TUnion(Foo("ABC")), TUnion(null)]);
     auto sdbar_data = bar.sbinSerialize;
     assert (sdbar_data.length == int.sizeof + 1 /+ length packed to 1 byte +/ +
         byte.sizeof + int.sizeof + // count 
         byte.sizeof + 1 /+ length packed to 1 byte +/ + 5 + // str
-        byte.sizeof + 1 /+ length packed to 1 byte +/ + 3 // Foo
+        byte.sizeof + 1 /+ length packed to 1 byte +/ + 3 + // Foo
+        byte.sizeof /+ length packed to 1 byte +/ // null
     );
     auto sdbar = sdbar_data.sbinDeserialize!Bar;
 
-    assert (sdbar.someInt == 4);
-    assert (sdbar.data.length == 3);
+    assert (sdbar.someInt == 77);
+    assert (sdbar.data.length == 4);
     assert (sdbar.data[0].kind == TUnion.Kind.count);
     assert (sdbar.data[0].get!int == 42);
     //assert (sdbar.data[0].count == 42);
@@ -52,6 +54,8 @@ void barTest()
     //assert (sdbar.data[2].foo == Foo("ABC"));
     assert (sdbar.data[2].get!Foo.name.ptr !=
               bar.data[2].get!Foo.name.ptr);
+
+    assert (sdbar.data[3].isNull);
 }
 
 void main()

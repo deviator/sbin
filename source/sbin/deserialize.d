@@ -211,7 +211,10 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
                         version (Have_mir_core)
                         {
                             T.AllowedTypes[i] tmp;
-                            impl(r, tmp, "value");
+
+                            // do not try deserialize null for nullable type
+                            static if (!is(typeof(tmp) == typeof(null)))
+                                impl(r, tmp, "value");
 
                             static if (__traits(compiles, trg = tmp))
                                 trg = tmp;
