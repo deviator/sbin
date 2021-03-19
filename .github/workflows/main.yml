@@ -14,15 +14,11 @@ jobs:
           - dmd-latest
           - ldc-latest
 
+          - dmd-2.095.1
           - dmd-2.094.2
-          - dmd-2.093.1
-          - dmd-2.092.1
-          - dmd-2.091.1
 
+          - ldc-1.25.0
           - ldc-1.24.0
-          - ldc-1.23.0
-          - ldc-1.22.0
-          - ldc-1.21.0
 
     runs-on: ${{ matrix.os }}
     steps:
