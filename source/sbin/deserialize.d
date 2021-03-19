@@ -186,40 +186,31 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
 
             (() @trusted => trg.rehash())();
         }
-        else static if (isTagged!T)
+        else static if (isTagged!(T).any)
         {
             import std.algorithm.mutation : move;
 
-            T.Kind kind;
-            impl(r, kind, "kind");
-            FS: final switch (kind)
+            TaggedTagType!T tag;
+            impl(r, tag, "tag");
+
+            FS: final switch (tag)
             {
-                static foreach (i, k; EnumMembers!(T.Kind))
+                static foreach (t; getTaggedAllTags!T)
                 {
-                    case k:
-                        version (Have_taggedalgebraic)
-                        {
-                            TypeOf!k tmp;
+                    case t:
+                        TaggedTypeByTag!(T, t) tmp;
+
+                        // do not try deserialize null for nullable type
+                        static if (!is(typeof(tmp) == typeof(null)))
                             impl(r, tmp, "value");
 
-                            static if (is(T == TaggedUnion!S, S))
-                                trg.set!k(move(tmp));
-                            else
-                                trg = tmp;
-                        }
+                        static if (__traits(compiles, trg = tmp)) trg = tmp;
                         else
-                        version (Have_mir_core)
                         {
-                            T.AllowedTypes[i] tmp;
-
-                            // do not try deserialize null for nullable type
-                            static if (!is(typeof(tmp) == typeof(null)))
-                                impl(r, tmp, "value");
-
-                            static if (__traits(compiles, trg = tmp))
-                                trg = tmp;
+                            static if (isTagged!(T).isSumType)
+                                trg = T(move(tmp));
                             else
-                                trg.set!k(move(tmp));
+                                trg.set!t(move(tmp));
                         }
 
                         break FS;

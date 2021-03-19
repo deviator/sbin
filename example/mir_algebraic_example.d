@@ -15,7 +15,8 @@ alias TUnion = Algebraic!(
     TaggedType!(Foo, "foo"),
 );
 
-static assert (isTagged!TUnion);
+static assert (isTagged!(TUnion).any);
+static assert (isTagged!(TUnion).isMirAlgebraic);
 
 struct Bar
 {

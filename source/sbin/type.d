@@ -40,18 +40,115 @@ package auto unpack(T, size_t N)(ubyte[N] arr)
 
 version (Have_taggedalgebraic) package import taggedalgebraic;
 version (Have_mir_core) package import mir.algebraic;
+version (Have_sumtype) package import sumtype;
 
 template isTagged(T)
 {
     version (Have_taggedalgebraic)
-        enum r = is(T == TaggedUnion!X, X) || is(T == TaggedAlgebraic!Y, Y);
+        enum isTaggedAlgebraic = is(T == TaggedUnion!X, X) || is(T == TaggedAlgebraic!Y, Y);
     else
-    version (Have_mir_core)
-        enum r = isVariant!T;
-    else
-        enum r = false;
+        enum isTaggedAlgebraic = false;
 
-    enum isTagged = r;
+    version (Have_mir_core)
+        enum isMirAlgebraic = isVariant!T;
+    else
+        enum isMirAlgebraic = false;
+
+    version (Have_sumtype)
+        enum isSumType = is(T == SumType!Args, Args...);
+    else
+        enum isSumType = false;
+
+    enum any = isTaggedAlgebraic || isMirAlgebraic || isSumType;
+}
+
+package(sbin)
+template taggedMatch(handlers...)
+{
+    auto taggedMatch(T)(auto ref T val) if (isTagged!(T).any)
+    {
+        static if (isTagged!(T).isSumType)
+            return sumtype.match!(handlers)(val);
+        else
+        static if (isTagged!(T).isTaggedAlgebraic)
+        {
+            static if (is(T == TaggedUnion!X, X))
+                return taggedalgebraic.visit.visit!(handlers)(val);
+            else static if (is(T == TaggedAlgebraic!Y, Y))
+                return taggedalgebraic.visit.visit!(handlers)(val.get!(TaggedUnion!Y));
+        }
+        else
+        static if (isTagged!(T).isMirAlgebraic)
+            return mir.algebraic.match!(handlers)(val);
+        else
+        static assert(0, "??");
+    }
+}
+
+package(sbin)
+template TaggedTagType(T) if (isTagged!(T).any)
+{
+    static if (isTagged!(T).isTaggedAlgebraic || isTagged!(T).isMirAlgebraic)
+        alias TaggedTagType = T.Kind;
+    else static if (isTagged!(T).isSumType)
+    {
+        import std : AliasSeq, Filter;
+        enum bool canHoldTag(X) = T.Types.length <= X.max;
+        alias unsignedInts = AliasSeq!(ubyte, ushort, uint, ulong);
+        alias TaggedTagType = Filter!(canHoldTag, unsignedInts)[0];
+    }
+}
+
+package(sbin)
+auto getTaggedAllTags(T)() if (isTagged!(T).any)
+{
+    import std : EnumMembers;
+
+    static if (isTagged!(T).isSumType)
+    {
+        alias TTT = TaggedTagType!T;
+        TTT[T.Types.length] ret;
+        foreach (i, ref v; ret) v = cast(TTT)i;
+        return ret;
+    }
+    else
+    static if (isTagged!(T).isTaggedAlgebraic || isTagged!(T).isMirAlgebraic)
+        return [EnumMembers!(T.Kind)];
+    else
+    static assert(0, "??");
+}
+
+package(sbin)
+template TaggedTypeByTag(T, alias tag) if (isTagged!(T).any)
+{
+    static if (isTagged!(T).isTaggedAlgebraic)
+        alias r = TypeOf!tag;
+    else
+    static if (isTagged!(T).isMirAlgebraic)
+    {
+        ptrdiff_t indexOf(T.Kind[] lst, T.Kind kind)
+        {
+            foreach (i, v; lst) if (v == kind) return i;
+            assert(0);
+        }
+        alias r = T.AllowedTypes[indexOf(getTaggedAllTags!T, tag)];
+    }
+    else
+    static if (isTagged!(T).isSumType)
+        alias r = T.Types[tag];
+
+    alias TaggedTypeByTag = r;
+}
+
+package(sbin)
+auto getTaggedTag(T)(in T val) if (isTagged!(T).any)
+{
+    static if (isTagged!(T).isSumType)
+        return cast(TaggedTagType!(T))(val.typeIndex);
+    else
+    static if (isTagged!(T).isMirAlgebraic || isTagged!(T).isTaggedAlgebraic)
+        return val.kind;
+    else static assert(0, "unsupported " ~ T.stringof);
 }
 
 template isVoidArray(T)

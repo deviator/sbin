@@ -12,9 +12,11 @@ d:
  - ldc-1.17.0
  - ldc-1.15.0
 script:
+ - dub test --compiler=${DC}
  - dub --root=example --compiler=${DC} --single mir_algebraic_example.d
  - dub --root=example --compiler=${DC} --single taggedalgebraic_example.d
- - dub test --compiler=${DC}
+ - dub --root=example --compiler=${DC} --single sumtype_example.d
+ - dub --root=example --compiler=${DC} --single all_example.d
  - dub test --compiler=${DC} --build=unittest-cov
 after_success:
  - bash <(curl -s https://codecov.io/bash)

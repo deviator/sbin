@@ -8,3 +8,4 @@ targetType "library"
 
 dependency "taggedalgebraic" version="~>0.11.18" optional=true
 dependency "mir-core" version="~>1.1.54" optional=true
+dependency "sumtype" version="~>1.1.0" optional=true

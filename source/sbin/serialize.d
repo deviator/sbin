@@ -73,27 +73,15 @@ void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const T
                 sbinSerialize!RH(r, v);
             }
         }
-        else static if (isTagged!T)
+        else static if (isTagged!(T).any)
         {
-            sbinSerialize!RH(r, val.kind);
-            FS: final switch (val.kind)
-            {
-                static foreach (i, k; EnumMembers!(T.Kind))
-                {
-                    case k:
-                        version (Have_taggedalgebraic)
-                            sbinSerialize!RH(r, cast(const(TypeOf!k))val);
-                        else
-                        version (Have_mir_core)
-                        {
-                            // do not try serialize null for nullable type
-                            static if (!is(T.AllowedTypes[i] == typeof(null)))
-                                sbinSerialize!RH(r, val.get!k);
-                        }
-
-                        break FS;
+            sbinSerialize!RH(r, getTaggedTag(val));
+            val.taggedMatch!(
+                (v) {
+                    static if (!is(Unqual!(typeof(v)) == typeof(null)))
+                        sbinSerialize!RH(r, v);
                 }
-            }
+            );
         }
         else static if (hasCustomRepr!(T, RH))
         {
