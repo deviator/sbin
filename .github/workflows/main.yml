@@ -35,6 +35,8 @@ jobs:
 
       - name: Run tests
         run: |
+          dub test
           dub --root=example --single mir_algebraic_example.d
           dub --root=example --single taggedalgebraic_example.d
-          dub test
+          dub --root=example --single sumtype_example.d
+          dub --root=example --single all_example.d
