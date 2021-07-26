@@ -34,6 +34,8 @@ void barTest()
         byte.sizeof + 1 /+ length packed to 1 byte +/ + 3 + // Foo
         byte.sizeof /+ length packed to 1 byte +/ // null
     );
+    assert (sdbar_data == [77, 0, 0, 0, 4, 1, 42, 0, 0, 0, 2, 5, 72,
+                           101, 108, 108, 111, 3, 3, 65, 66, 67, 0]);
     auto sdbar = sdbar_data.sbinDeserialize!Bar;
 
     assert (sdbar.someInt == 77);
