@@ -850,7 +850,18 @@ unittest
     import std.algorithm : map;
     import std.array : array;
 
-    BitArray b = iota(273).map!(a=>cast(bool)uniform!"[]"(0,1)).array;
+    // 273 random bits.
+    BitArray b = [0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1,
+                  0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0,
+                  1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1,
+                  0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0,
+                  1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1,
+                  0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1,
+                  0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0,
+                  0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0,
+                  1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1,
+                  1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1,
+                  0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1];
 
     static struct BitArrayWrap
     {
@@ -871,7 +882,12 @@ unittest
         { return BitArrayWrap(r); }
     }
 
-    const t1 = sbinDeserialize!BitArrayWrap(sbinSerialize(BitArrayWrap(b))).arr;
+    immutable ubyte[] stable_format = [145, 2, 40, 78, 215, 143, 77, 12, 42, 60, 164, 101, 132,
+                                       114, 188, 53, 58, 249, 88, 202, 201, 53, 159, 251, 57,
+                                       163, 202, 10, 33, 70, 43, 39, 187, 246, 155, 79, 207, 1,
+                                       0, 0, 0, 0, 0];
+    assert (equal(sbinSerialize(BitArrayWrap(b)), stable_format));
+    const t1 = sbinDeserialize!BitArrayWrap(stable_format).arr;
 
     assert (b == t1);
 
@@ -883,7 +899,8 @@ unittest
         this(BitArray ba) { bitcount = ba.length; data = cast(void[])ba; }
     }
 
-    const pft2 = sbinDeserialize!BitArrayWrap2(sbinSerialize(BitArrayWrap2(b)));
+    assert (equal(sbinSerialize(BitArrayWrap2(b)), stable_format));
+    const pft2 = sbinDeserialize!BitArrayWrap2(stable_format);
 
     const t2 = BitArray(pft2.data.dup, pft2.bitcount);
 
@@ -903,7 +920,8 @@ unittest
         SysTime fromRepr(long r) { return SysTime(r, UTC()); }
     }
 
-    auto t3 = sbinDeserialize!(RH, BitArray)(sbinSerialize!RH(b));
+    assert (sbinSerialize!RH(b) == stable_format);
+    auto t3 = sbinDeserialize!(RH, BitArray)(stable_format);
 
     assert (b == t3);
 
@@ -914,9 +932,13 @@ unittest
         SysTime tm;
     }
 
-    auto foo = Foo("hello", b, Clock.currTime);
+    auto foo = Foo("hello", b, SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC()));
 
     const foo_bytes = sbinSerialize!RH(foo);
+    assert (foo_bytes == [5, 104, 101, 108, 108, 111, 145, 2, 40, 78, 215, 143, 77, 12, 42,
+                          60, 164, 101, 132, 114, 188, 53, 58, 249, 88, 202, 201, 53, 159,
+                          251, 57, 163, 202, 10, 33, 70, 43, 39, 187, 246, 155, 79, 207, 1,
+                          0, 0, 0, 0, 0, 0, 196, 124, 156, 2, 81, 213, 8]);
 
     auto foo2 = sbinDeserialize!(RH, Foo)(foo_bytes);
 
