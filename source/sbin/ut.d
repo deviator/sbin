@@ -24,7 +24,7 @@ import sbin.deserialize;
     Semantic versioning (semver.org) applies to the binary compatibility of
     APIs, but due to the scope of sbin we also keep the format stable across
     at least minor and patch version increments. Meaning that if the format
-    changes then a major version bump is required.
+    changes then a major version bump is required. See also README.md.
 */
 
 version (unittest) import std.algorithm : equal;

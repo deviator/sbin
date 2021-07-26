@@ -113,6 +113,27 @@ const barSize = ulong.sizeof + float.sizeof + ubyte.sizeof +
 assert(bar.sbinSerialize.length == barSize);
 ```
 
+### Stable binary format across minor releases
+
+If you use sbin to serialize data to and from file, you will be interested
+to maintain stability in the binary serialization format, so that files saved
+with older versions of your softare can be opened in newer versions. Sbin has
+been using the same format since release 0.5.0, and will continue doing so at
+least until the major version number is bumped. It is therefore safe to allow
+dub to do minor version upgrades with a version specification like `~>0.8`,
+equivalent to ">=0.8.0 <1.0.0".
+
+If, in the future, changes to the format are made, then sbin will provide a 
+variant of `sbinDeserialize` that supports the older format(s). This will be
+mentioned in the release notes.
+
+However, it will be up to the application programmer (you) to call the correct
+variant of `sbinDeserialize`. You are therefore advised to **save your files
+with a file header** from which you will always be able to derive the format
+version with which the succeeding bytes should be deserialized.
+
+(Of course the major version number *may* be bumped without changing the format.)
+
 ### Skipping fields
 
 If a field in a struct has the `@sbinSkip` attribute, the field will
