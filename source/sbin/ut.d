@@ -7,50 +7,89 @@ import sbin.exception;
 import sbin.serialize;
 import sbin.deserialize;
 
+/*  A note about `stable_format` arrays below.
+
+    The binary format of serializations has been stable since release v0.5.0.
+    The literal byte arrays in the unit tests are there to ensure that this
+    format remains stable across releases, and their values should not be
+    edited if at all possible. This is important where `sbin` is used for file
+    i/o.
+
+    If a change in the format is unavoidable, a deserialization method for the
+    previous format(s) will need to be implemented, and the release notes will
+    have to clearly state the incompatibility with instructions for how to deal
+    with it. One way would be for `sbinDeserialize` to accept an additional
+    template parameter containing a version string.
+
+    Semantic versioning (semver.org) applies to the binary compatibility of
+    APIs, but due to the scope of sbin we also keep the format stable across
+    at least minor and patch version increments. Meaning that if the format
+    changes then a major version bump is required.
+*/
+
 version (unittest) import std.algorithm : equal;
 
 @safe unittest
 {
     const a = 123;
-    assert(a.sbinSerialize.sbinDeserialize!int == a);
+    immutable ubyte[] stable_format = [123, 0, 0, 0];
+    assert (a.sbinSerialize == stable_format);
+    assert (stable_format.sbinDeserialize!int == a);
 }
 
 @safe unittest
 {
     enum V { v }
     const a = V.v;
-    static assert(is(V == enum));
-    static assert(is(EnumNumType!V == ubyte));
-    const s = a.sbinSerialize;
-    assert (s.length == 1);
-    assert(s.sbinDeserialize!V == a);
+    static assert (is(V == enum));
+    static assert (is(EnumNumType!V == ubyte));
+    immutable ubyte[] stable_format = [0];
+    assert (a.sbinSerialize == stable_format);
+    assert (stable_format.sbinDeserialize!V == a);
 }
 
 @safe unittest
 {
     const a = 123;
     auto as = a.sbinSerialize;
+    assert (as == [123, 0, 0, 0]);
     int x;
     sbinDeserialize(as, x);
-    assert(a == x);
+    assert (a == x);
 }
 
 @safe unittest
 {
     auto s = "hello world";
-    assert(equal(s.sbinSerialize.sbinDeserialize!string, s));
+    immutable ubyte[] stable_format = [11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
+    assert (s.sbinSerialize == stable_format);
+    assert (equal(stable_format.sbinDeserialize!string, s));
 }
 
 @safe unittest
 {
-    immutable(int[]) a = [1,2,3,2,3,2,1];
-    assert(a.sbinSerialize.sbinDeserialize!(int[]) == a);
+    immutable(int[]) a = [1, 2, 3, 2, 3, 2, 1];
+    immutable ubyte[] stable_format = [7, 1, 0, 0, 0,
+                                          2, 0, 0, 0,
+                                          3, 0, 0, 0,
+                                          2, 0, 0, 0,
+                                          3, 0, 0, 0,
+                                          2, 0, 0, 0,
+                                          1, 0, 0, 0];
+    assert (a.sbinSerialize == stable_format);
+    assert (stable_format.sbinDeserialize!(int[]) == a);
 }
 
 @safe unittest
 {
-    const int[5] a = [1,2,3,2,3];
-    assert(a.sbinSerialize.sbinDeserialize!(typeof(a)) == a);
+    const int[5] a = [1, 2, 3, 2, 3];
+    immutable ubyte[] stable_format = [1, 0, 0, 0,
+                                       2, 0, 0, 0,
+                                       3, 0, 0, 0,
+                                       2, 0, 0, 0,
+                                       3, 0, 0, 0];
+    assert (a.sbinSerialize == stable_format);
+    assert (stable_format.sbinDeserialize!(typeof(a)) == a);
 }
 
 @safe unittest
@@ -87,8 +126,9 @@ version (unittest) import std.algorithm : equal;
 
     const foo1Data = foo1.sbinSerialize;
 
-    assert(foo1Data.length == foo1Size);
-    assert(foo1Data.sbinDeserialize!Foo == foo1);
+    assert (foo1Data.length == foo1Size);
+    assert (foo1Data == [10, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 72, 225, 10, 64, 8, 0, 2, 115, 49, 1]);
+    assert (foo1Data.sbinDeserialize!Foo == foo1);
     
     const foo2 = Foo(2, 2.22, 2.22, 2, "str2", Color.green);
 
@@ -97,8 +137,9 @@ version (unittest) import std.algorithm : equal;
 
     const foo2Data = foo2.sbinSerialize;
 
-    assert(foo2Data.length == foo2Size);
-    assert(foo2Data.sbinDeserialize!Foo == foo2);
+    assert (foo2Data.length == foo2Size);
+    assert (foo2Data == [2, 0, 0, 0, 0, 0, 0, 0, 123, 20, 14, 64, 123, 20, 14, 64, 2, 0, 4, 115, 116, 114, 50, 2]);
+    assert (foo2Data.sbinDeserialize!Foo == foo2);
 
     struct Bar
     {
@@ -115,7 +156,12 @@ version (unittest) import std.algorithm : equal;
     //                                 foos
                     (1 + foo1Size + foo2Size);
     
-    assert(bar.sbinSerialize.length == barSize);
+    const barData = bar.sbinSerialize;
+    assert (barData.length == barSize);
+    assert (barData == [123, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 2, 2, 10, 0,
+                        0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 72, 225, 10, 64, 8,
+                        0, 2, 115, 49, 1, 2, 0, 0, 0, 0, 0, 0, 0, 123, 20, 14,
+                        64, 123, 20, 14, 64, 2, 0, 4, 115, 116, 114, 50, 2]);
 
     auto data = [
         bar,
@@ -130,9 +176,19 @@ version (unittest) import std.algorithm : equal;
     ];
 
     auto sdata = data.sbinSerialize;
-    assert( equal(sdata.sbinDeserialize!(Bar[]), data));
+    assert (sdata == [2, 123, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 2, 2, 10,
+                      0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 72, 225, 10, 64, 8,
+                      0, 2, 115, 49, 1, 2, 0, 0, 0, 0, 0, 0, 0, 123, 20, 14, 64,
+                      123, 20, 14, 64, 2, 0, 4, 115, 116, 114, 50, 2, 23, 0, 0,
+                      0, 0, 0, 0, 0, 51, 51, 251, 65, 2, 3, 10, 0, 0, 0, 0, 0,
+                      0, 0, 174, 71, 225, 61, 174, 71, 97, 62, 50, 0, 5, 49,
+                      111, 110, 101, 49, 0, 20, 0, 0, 0, 0, 0, 0, 0, 184, 30, 5,
+                      62, 0, 0, 128, 62, 70, 0, 5, 50, 116, 119, 111, 50, 0, 30,
+                      0, 0, 0, 0, 0, 0, 0, 154, 153, 25, 62, 41, 92, 143, 62,
+                      30, 0, 7, 51, 116, 104, 114, 101, 101, 51, 4]);
+    assert ( equal(sdata.sbinDeserialize!(Bar[]), data));
     data[0].foos[1].d = 12_345;
-    assert(!equal(sdata.sbinDeserialize!(Bar[]), data));
+    assert (!equal(sdata.sbinDeserialize!(Bar[]), data));
 }
 
 @safe unittest
@@ -154,52 +210,50 @@ version (unittest) import std.algorithm : equal;
 @safe unittest
 {
     static void foo(int a=123, string b="hello")
-    { assert(a==123); assert(b=="hello"); }
+    { assert (a==123); assert (b=="hello"); }
 
     auto a = ParameterDefaults!foo;
 
     import std.typecons : tuple;
     const sa = tuple(a).sbinSerialize;
+    assert (sa == [123, 0, 0, 0, 5, 104, 101, 108, 108, 111]);
 
     Parameters!foo b;
     b = sa.sbinDeserialize!(typeof(tuple(b)));
-    assert(a == b);
+    assert (a == b);
     foo(b);
 
     a[0] = 234;
     a[1] = "okda";
     auto sn = tuple(a).sbinSerialize;
+    assert (sn == [234, 0, 0, 0, 4, 111, 107, 100, 97]);
 
     sn.sbinDeserialize(b);
 
-    assert(b[0] == 234);
-    assert(b[1] == "okda");
+    assert (b[0] == 234);
+    assert (b[1] == "okda");
 }
 
 @safe unittest
 {
     auto a = [1,2,3,4];
     auto as = a.sbinSerialize;
-    auto as_tr = as[0..$-3];
-    assertThrown!SBinDeserializeEmptyRangeException(as_tr.sbinDeserialize!(typeof(a)));
-}
-
-@safe unittest
-{
-    auto a = [1,2,3,4];
-    auto as = a.sbinSerialize;
-    auto as_tr = as ~ as;
-    assertThrown!SBinDeserializeException(as_tr.sbinDeserialize!(typeof(a)));
+    assert (as == [4, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0]);
+    auto as_tr1 = as[0..$-3];
+    assertThrown!SBinDeserializeEmptyRangeException(as_tr1.sbinDeserialize!(typeof(a)));
+    auto as_tr2 = as ~ as;
+    assertThrown!SBinDeserializeException(as_tr2.sbinDeserialize!(typeof(a)));
 }
 
 @safe unittest
 {
     auto a = ["hello" : 123, "ok" : 43];
     auto as = a.sbinSerialize;
+    assert (as == [2, 2, 111, 107, 43, 0, 0, 0, 5, 104, 101, 108, 108, 111, 123, 0, 0, 0]);
 
     auto b = as.sbinDeserialize!(typeof(a));
-    assert(b["hello"] == 123);
-    assert(b["ok"] == 43);
+    assert (b["hello"] == 123);
+    assert (b["ok"] == 43);
 }
 
 unittest
@@ -214,18 +268,22 @@ unittest
     auto b = X([8: "abc", 15: "ololo"], ["zb": 10]);
 
     const as = a.sbinSerialize;
+    assert (as == [2, 3, 0, 0, 0, 5, 104, 101, 108, 108, 111, 8, 0, 0, 0, 3, 97,
+                   98, 99, 2, 2, 111, 107, 1, 0, 0, 0, 2, 110, 111, 2, 0, 0, 0]);
     const bs = b.sbinSerialize;
+    assert (bs == [2, 8, 0, 0, 0, 3, 97, 98, 99, 15, 0, 0, 0, 5, 111, 108, 111,
+                   108, 111, 1, 2, 122, 98, 10, 0, 0, 0]);
 
     auto c = as.sbinDeserialize!X;
 
     import std.algorithm : sort;
-    assert(equal(sort(a.one.keys.dup), sort(c.one.keys.dup)));
-    assert(equal(sort(a.one.values.dup), sort(c.one.values.dup)));
+    assert (equal(sort(a.one.keys.dup), sort(c.one.keys.dup)));
+    assert (equal(sort(a.one.values.dup), sort(c.one.values.dup)));
 
     bs.sbinDeserialize(c);
 
-    assert(equal(sort(b.one.keys.dup), sort(c.one.keys.dup)));
-    assert(equal(sort(b.one.values.dup), sort(c.one.values.dup)));
+    assert (equal(sort(b.one.keys.dup), sort(c.one.keys.dup)));
+    assert (equal(sort(b.one.values.dup), sort(c.one.values.dup)));
 }
 
 @safe unittest
@@ -234,9 +292,10 @@ unittest
     T[] a;
     with(T) a = [one, two, three, two, three, two, one];
     const as = a.sbinSerialize;
+    assert (as == [7, 0, 1, 2, 1, 2, 1, 0]);
 
     auto b = as.sbinDeserialize!(typeof(a));
-    assert(equal(a, b));
+    assert (equal(a, b));
 }
 
 @safe unittest
@@ -245,11 +304,12 @@ unittest
     T[] a;
     with(T) a = [one, two, three, two, three, two, one];
     const as = a.sbinSerialize;
+    assert (as == [7, 0, 1, 2, 1, 2, 1, 0]);
 
-    assert(as.length == 7 + 1);
+    assert (as.length == 7 + 1);
 
     auto b = as.sbinDeserialize!(typeof(a));
-    assert(equal(a, b));
+    assert (equal(a, b));
 }
 
 @safe unittest
@@ -259,13 +319,14 @@ unittest
 
     import std.typecons : tuple;
     auto buf = sbinSerialize(tuple(ai, as));
+    assert (buf == [31, 2, 0, 0, 5, 104, 101, 108, 108, 111]);
 
     int bi;
     string bs;
     sbinDeserialize(buf, bi, bs);
 
-    assert(ai == bi);
-    assert(bs == as);
+    assert (ai == bi);
+    assert (bs == as);
 }
 
 @safe unittest
@@ -275,13 +336,14 @@ unittest
 
     auto buf = appender!(ubyte[]);
     sbinSerialize(buf, ai, as);
+    assert (buf.data == [31, 2, 0, 0, 5, 104, 101, 108, 108, 111]);
 
     int bi;
     string bs;
     sbinDeserialize(buf.data, bi, bs);
 
-    assert(ai == bi);
-    assert(bs == as);
+    assert (ai == bi);
+    assert (bs == as);
 }
 
 @safe unittest
@@ -313,7 +375,7 @@ unittest
 
     alias Buffer = ImplaceAppender!(ubyte[]);
 
-    static assert(isOutputRange!(Buffer, ubyte));
+    static assert (isOutputRange!(Buffer, ubyte));
 
     enum State
     {
@@ -362,7 +424,15 @@ unittest
 
     () @nogc { buffer.sbinSerialize(lines); }();
 
-    assert(equal(buffer.data.sbinDeserialize!(typeof(lines)), lines));
+    assert (buffer.data == [2, 123, 0, 0, 0, 0, 0, 0, 0, 195, 245, 72, 64, 72, 225, 10, 64, 3, 1, 0, 0, 0, 0, 0, 0, 0,
+                            205, 204, 140, 63, 205, 204, 12, 64, 5, 0, 8, 0, 3, 111, 110, 101, 0, 2, 0, 0, 0, 0, 0, 0,
+                            0, 102, 102, 166, 63, 0, 0, 32, 64, 7, 0, 9, 0, 3, 116, 119, 111, 1, 3, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 192, 63, 51, 51, 51, 64, 3, 0, 7, 0, 5, 116, 104, 114, 101, 101, 2, 23, 0, 0, 0, 0, 0,
+                            0, 0, 51, 51, 251, 65, 154, 153, 173, 65, 3, 10, 0, 0, 0, 0, 0, 0, 0, 174, 71, 225, 61, 174,
+                            71, 97, 62, 50, 0, 80, 0, 5, 49, 111, 110, 101, 49, 1, 20, 0, 0, 0, 0, 0, 0, 0, 184, 30, 5,
+                            62, 0, 0, 128, 62, 70, 0, 90, 0, 5, 50, 116, 119, 111, 50, 2, 30, 0, 0, 0, 0, 0, 0, 0, 154,
+                            153, 25, 62, 41, 92, 143, 62, 30, 0, 70, 0, 7, 51, 116, 104, 114, 101, 101, 51, 0]);
+    assert (equal(buffer.data.sbinDeserialize!(typeof(lines)), lines));
 }
 
 @safe unittest
@@ -385,9 +455,12 @@ unittest
 
     auto foo = Foo(12);
 
-    assert(foo.sbinSerialize.sbinDeserialize!Foo == foo);
-    assert(ser);
-    assert(deser);
+    immutable ubyte[] stable_format = [12, 0, 0, 0, 0, 0, 0, 0];
+    assert (foo.sbinSerialize == stable_format);
+    assert (stable_format.sbinDeserialize!Foo == foo);
+
+    assert (ser);
+    assert (deser);
 }
 
 @safe unittest
@@ -411,9 +484,11 @@ unittest
 
     auto foo = new Foo(12);
 
-    assert(foo.sbinSerialize.sbinDeserialize!Foo.id == 12);
-    assert(ser);
-    assert(deser);
+    immutable ubyte[] stable_format = [12, 0, 0, 0, 0, 0, 0, 0];
+    assert (foo.sbinSerialize == stable_format);
+    assert (stable_format.sbinDeserialize!Foo.id == 12);
+    assert (ser);
+    assert (deser);
 
     Foo[] fooArr;
     foreach (i; 0 .. 10)
@@ -421,8 +496,13 @@ unittest
 
     import std.algorithm : map;
 
-    auto fooArr2 = fooArr.sbinSerialize.sbinDeserialize!(Foo[]);
-    assert(equal(fooArr.map!"a.id", fooArr2.map!"a.id"));
+    immutable ubyte[] stable_format2 = [10, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3,
+                                        0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0,
+                                        0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0,
+                                        0, 0, 0];
+    assert (fooArr.sbinSerialize == stable_format2);
+    auto fooArr2 = stable_format2.sbinDeserialize!(Foo[]);
+    assert (equal(fooArr.map!"a.id", fooArr2.map!"a.id"));
 }
 
 @safe unittest
@@ -438,8 +518,8 @@ unittest
 
     auto foo = new Foo(12);
 
-    static assert(!is(typeof(foo.sbinSerialize)));
-    static assert(!is(typeof(foo.sbinSerialize.sbinDeserialize!Foo.id)));
+    static assert (!is(typeof(foo.sbinSerialize)));
+    static assert (!is(typeof(foo.sbinSerialize.sbinDeserialize!Foo.id)));
 }
 
 @safe unittest
@@ -456,7 +536,7 @@ unittest
         ));
     }
 
-    static assert(Foo.sizeof == 1);
+    static assert (Foo.sizeof == 1);
 
     Foo foo;
     foo.a = true;
@@ -464,23 +544,24 @@ unittest
     foo.c = 9;
     foo.d = 3;
 
-    assert(foo.a);
-    assert(foo.b == false);
-    assert(foo.c == 9);
-    assert(foo.d == 3);
+    assert (foo.a);
+    assert (foo.b == false);
+    assert (foo.c == 9);
+    assert (foo.d == 3);
 
     auto sfoo = foo.sbinSerialize;
 
-    assert(sfoo.length == 1);
+    assert (sfoo.length == 1);
+    assert (sfoo == [229]);
 
     auto bar = sfoo.sbinDeserialize!Foo;
 
-    assert(bar.a);
-    assert(bar.b == false);
-    assert(bar.c == 9);
-    assert(bar.d == 3);
+    assert (bar.a);
+    assert (bar.b == false);
+    assert (bar.c == 9);
+    assert (bar.d == 3);
 
-    assert(foo == bar);
+    assert (foo == bar);
 }
 
 @safe unittest
@@ -494,36 +575,44 @@ unittest
     const foo = Foo(arr, arr[0..2]);
     assert (foo.a.ptr == foo.b.ptr);
     
-    const foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
-    assert(foo == foo2);
-    assert(foo.a.ptr != foo2.a.ptr);
-    assert(foo.b.ptr != foo2.b.ptr);
-    assert(foo2.a.ptr != foo2.b.ptr);
+    immutable ubyte[] stable_format = [6, 1, 2, 3, 4, 5, 6, 2, 1, 2];
+    assert (foo.sbinSerialize == stable_format);
+    const foo2 = stable_format.sbinDeserialize!Foo;
+    assert (foo == foo2);
+    assert (foo.a.ptr != foo2.a.ptr);
+    assert (foo.b.ptr != foo2.b.ptr);
+    assert (foo2.a.ptr != foo2.b.ptr);
 }
 
 unittest
 {
     struct Foo { void[] a; }
     auto foo = Foo("hello".dup);
-    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
-    assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
+    immutable ubyte[] stable_format = [5, 104, 101, 108, 108, 111];
+    assert (foo.sbinSerialize == stable_format);
+    auto foo2 = stable_format.sbinDeserialize!Foo;
+    assert (equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
 }
 
 unittest
 {
     struct Foo { void[5] a; }
     auto foo = Foo(cast(void[5])"hello");
-    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
-    assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
+    immutable ubyte[] stable_format = [104, 101, 108, 108, 111];
+    assert (foo.sbinSerialize == stable_format);
+    auto foo2 = stable_format.sbinDeserialize!Foo;
+    assert (equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
 }
 
 unittest
 {
     struct Foo { void[] a; void[5] b; }
     auto foo = Foo("hello".dup, cast(void[5])"world");
-    auto foo2 = foo.sbinSerialize.sbinDeserialize!Foo;
-    assert(equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
-    assert(equal(cast(ubyte[])foo.b, cast(ubyte[])foo2.b));
+    immutable ubyte[] stable_format = [5, 104, 101, 108, 108, 111, 119, 111, 114, 108, 100];
+    assert (foo.sbinSerialize == stable_format);
+    auto foo2 = stable_format.sbinDeserialize!Foo;
+    assert (equal(cast(ubyte[])foo.a, cast(ubyte[])foo2.a));
+    assert (equal(cast(ubyte[])foo.b, cast(ubyte[])foo2.b));
 }
 
 unittest
@@ -539,7 +628,7 @@ unittest
     }
 
     auto foo = Foo(12);
-    static assert(!__traits(compiles, foo.sbinSerialize.sbinDeserialize!Foo));
+    static assert (!__traits(compiles, foo.sbinSerialize.sbinDeserialize!Foo));
 }
 
 @safe unittest
@@ -552,13 +641,15 @@ unittest
         byte ival;
     }
 
-    static assert(Union.init.sizeof == max(float.sizeof, byte.sizeof));
+    static assert (Union.init.sizeof == max(float.sizeof, byte.sizeof));
 
     Union u;
     u.ival = 114;
     assert (u.ival == 114);
 
-    const su = u.sbinSerialize.sbinDeserialize!Union;
+    immutable ubyte[] stable_format = [114, 0, 192, 127];
+    assert (u.sbinSerialize == stable_format);
+    const su = stable_format.sbinDeserialize!Union;
     assert (su.ival == 114);
 }
 
@@ -570,6 +661,7 @@ unittest
     auto foo1 = Foo1("hello".dup, cast(void[5])"world");
 
     sbinSerialize(buf, foo1);
+    assert (buf.data == [5, 104, 101, 108, 108, 111, 119, 111, 114, 108, 100]);
 
     static struct Foo2
     {
@@ -591,18 +683,19 @@ unittest
     sbinSerialize(buf, foo2);
 
     auto data = buf.data;
+    assert (data == [5, 104, 101, 108, 108, 111, 119, 111, 114, 108, 100, 229]);
 
     auto dsfoo1 = sbinDeserializePart!Foo1(data);
     const dsfoo2 = sbinDeserializePart!Foo2(data);
 
     assert (data.empty);
 
-    assert(equal(cast(ubyte[])foo1.a, cast(ubyte[])dsfoo1.a));
-    assert(equal(cast(ubyte[])foo1.b, cast(ubyte[])dsfoo1.b));
-    assert(dsfoo2.a);
-    assert(dsfoo2.b == false);
-    assert(dsfoo2.c == 9);
-    assert(dsfoo2.d == 3);
+    assert (equal(cast(ubyte[])foo1.a, cast(ubyte[])dsfoo1.a));
+    assert (equal(cast(ubyte[])foo1.b, cast(ubyte[])dsfoo1.b));
+    assert (dsfoo2.a);
+    assert (dsfoo2.b == false);
+    assert (dsfoo2.c == 9);
+    assert (dsfoo2.d == 3);
 }
 
 @safe unittest
@@ -616,8 +709,9 @@ unittest
         Point(Pos(9,5), Label.bad),
     ];
     auto data = sbinSerialize(val);
+    assert (data == [3, 0, 0, 0, 7, 0, 0, 0, 0, 9, 0, 0, 0, 5, 0, 0, 0, 1]);
 
-    assert(data.length == 18);
+    assert (data.length == 18);
 
     import std.algorithm : canFind;
 
@@ -668,8 +762,9 @@ unittest
     ushort[] val = [10,12,14,15];
 
     auto data = sbinSerialize(val);
+    assert (data == [4, 10, 0, 12, 0, 14, 0, 15, 0]);
 
-    assert(data.length == 9);
+    assert (data.length == 9);
 
     import std.algorithm : canFind;
 
@@ -700,6 +795,7 @@ unittest
 {
     short[] value;
     auto rng = sbinSerialize(value);
+    assert (rng == [0]);
     assert (rng.length == 1);
     assert (rng[0] == 0);
 
@@ -728,6 +824,7 @@ unittest
     assert (rng[1] == 2);
     //assert (rng[2] == 4);
     assert (rng[4] == 6);
+    assert (rng == [3, 2, 131, 2, 6]);
 
     assert (value ==  sbinDeserialize!(typeof(value))(rng));
 }
