@@ -53,7 +53,28 @@ void barTest()
     assert (sdbar.data[3].typeIndex == 0);
 }
 
+alias UT3 = SumType!(typeof(null), byte, This[]);
+
+void ut3Test()
+{
+    auto val1 = UT3([
+        UT3(42),
+        UT3(null),
+        UT3([
+            UT3(null),
+            UT3(65)
+        ]),
+        UT3(12)
+    ]);
+
+    auto data = sbinSerialize(val1);
+    assert (data == [2, 4, 1, 42, 0, 2, 2, 0, 1, 65, 1, 12]);
+    auto val2 = sbinDeserialize!UT3(data);
+    assert (val1 == val2);
+}
+
 void main()
 {
     barTest();
+    ut3Test();
 }
