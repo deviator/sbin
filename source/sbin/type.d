@@ -40,7 +40,19 @@ package auto unpack(T, size_t N)(ubyte[N] arr)
 
 version (Have_taggedalgebraic) package import taggedalgebraic;
 version (Have_mir_core) package import mir.algebraic;
-version (Have_sumtype) package import sumtype;
+
+version (Have_sumtype)
+{
+    version = Have_any_sumtype;
+    package import sumtype;
+}
+else static if (__VERSION__ >= 2097)
+{
+    version = Have_any_sumtype;
+    version = Have_std_sumtype;
+    package import std.sumtype;
+    alias sumtype = std.sumtype;
+}
 
 template isTagged(T)
 {
@@ -54,7 +66,7 @@ template isTagged(T)
     else
         enum isMirAlgebraic = false;
 
-    version (Have_sumtype)
+    version (Have_any_sumtype)
         enum isSumType = is(T == SumType!Args, Args...);
     else
         enum isSumType = false;
@@ -144,7 +156,18 @@ package(sbin)
 auto getTaggedTag(T)(in T val) if (isTagged!(T).any)
 {
     static if (isTagged!(T).isSumType)
-        return cast(TaggedTagType!(T))(val.typeIndex);
+    {
+        alias TTT = TaggedTagType!T;
+        version (Have_std_sumtype)
+        {
+            import std : staticIndexOf;
+            // version from std doesn't have typeIndex
+            // https://github.com/dlang/phobos/pull/7922
+            return cast(TTT)(sumtype.match!(v => staticIndexOf!(typeof(v), T.Types))(*(cast(T*)&val)));
+        }
+        else
+            return cast(TTT)val.typeIndex;
+    }
     else
     static if (isTagged!(T).isMirAlgebraic || isTagged!(T).isTaggedAlgebraic)
         return val.kind;

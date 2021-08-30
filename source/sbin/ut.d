@@ -947,3 +947,75 @@ unittest
     assert (foo.tm == foo2.tm);
     assert (foo == foo2);
 }
+
+static if (__VERSION__ >= 2097)
+{
+    import std.sumtype;
+
+    alias UT1 = SumType!(string, int);
+
+    //@safe // sumtype opAssign not safe
+    unittest
+    {
+        const a = "hello";
+
+        auto val1 = UT1(a);
+
+        assert (val1.match!(v => is(typeof(v) == string)));
+
+        auto data = sbinSerialize(val1);
+
+        assert (data == [0, 5, 104, 101, 108, 108, 111]);
+
+        auto val2 = sbinDeserialize!UT1(data);
+
+        assert (val1 == val2);
+        assert (val2.match!(v => is(typeof(v) == string)));
+    }
+
+    unittest
+    {
+        const a = 42;
+
+        auto val1 = UT1(a);
+
+        assert (val1.match!(v => is(typeof(v) == int)));
+
+        auto data = sbinSerialize(val1);
+
+        assert (data == [1, 42, 0, 0, 0]);
+
+        auto val2 = sbinDeserialize!UT1(data);
+
+        assert (val1 == val2);
+        assert (val2.match!(v => is(typeof(v) == int)));
+    }
+
+    alias UT2 = SumType!(typeof(null), byte, byte[3]);
+
+    unittest
+    {
+        auto val1 = [UT2(null), UT2(6), UT2([11,12,13])];
+        auto data = sbinSerialize(val1);
+        assert (data == [3, 0, 1, 6, 2, 11, 12, 13]);
+        auto val2 = sbinDeserialize!(UT2[])(data);
+        assert (val1 == val2);
+    }
+
+    alias UT3 = SumType!(typeof(null), byte, This[]);
+
+    unittest
+    {
+        auto val1 = UT3([
+            UT3(42),
+            UT3(null),
+            UT3([ UT3(null), UT3(65) ]),
+            UT3(12)
+        ]);
+
+        auto data = sbinSerialize(val1);
+        assert (data == [2, 4, 1, 42, 0, 2, 2, 0, 1, 65, 1, 12]);
+        auto val2 = sbinDeserialize!UT3(data);
+        assert (val1 == val2);
+    }
+}

@@ -46,7 +46,8 @@ Creates `Unqual!Target ret`, fill it and return.
 
 ### Key points
 
-* only dynamic arrays (associative arrays too) has variable length, all other types has fixed size
+* dynamic arrays (associative arrays too) and algebraic types (serialized only
+current value, not full storage) has variable length, all other types has fixed size
 
 ### Example
 
@@ -158,8 +159,12 @@ Add to your type `Foo`:
 
 ### Tagged algebraics
 
-See [`taggedalgebraic` example](example/taggedalgebraic_example.d) and 
-[`mir.algebraic` example](example/mir_algebraic_example.d).
+See
+* [`taggedalgebraic` example](example/taggedalgebraic_example.d)
+* [`mir.algebraic` example](example/mir_algebraic_example.d)
+* [`sumtype` example](example/sumtype_example.d)
+
+Phobos 2.097 include `std.sumtype`, it supports too. 
 
 ### Types that can't be changed
 
