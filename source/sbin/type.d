@@ -163,7 +163,7 @@ auto getTaggedTag(T)(in T val) if (isTagged!(T).any)
             import std : staticIndexOf;
             // version from std doesn't have typeIndex
             // https://github.com/dlang/phobos/pull/7922
-            return cast(TTT)(sumtype.match!(v => staticIndexOf!(typeof(v), T.Types))(*(cast(T*)&val)));
+            return cast(TTT)(sumtype.match!(v => staticIndexOf!(typeof(v), T.Types))(cast()val));
         }
         else
             return cast(TTT)val.typeIndex;

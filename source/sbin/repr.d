@@ -1,6 +1,7 @@
 module sbin.repr;
 
 import std.traits : Unqual;
+import std.meta : allSatisfy;
 
 import sbin.serialize;
 import sbin.deserialize;
@@ -28,11 +29,12 @@ template hasRepr(RH, T) if (isReprHandler!RH)
         enum hasRepr = false;
 }
 
-template hasSerializeRepr(RH, T)
-{ enum hasSerializeRepr = is(typeof(sbinSerialize!RH(RH.repr(T.init)))); }
+enum hasSerializeRepr(RH, T) = is(typeof(sbinSerialize!RH(RH.repr(T.init))));
 
-template hasDeserializeRepr(RH, T, Repr)
-{ enum hasDeserializeRepr = is(typeof(RH.fromRepr((ubyte[]).init.sbinDeserialize!(RH, Repr)())) == Unqual!T); }
+enum hasDeserializeRepr(RH, T, Repr) =
+    is( typeof(
+            RH.fromRepr(sbinDeserialize!(RH, Repr)((ubyte[]).init))
+        ) == Unqual!T);
 
 template serializeRepr(RH, T) if (hasSerializeRepr!(RH, T))
 { alias serializeRepr = typeof(RH.repr(T.init)); }
@@ -67,3 +69,53 @@ unittest
     static assert (hasDeserializeRepr!(CRH, SysTime, long));
     static assert (hasRepr!(CRH, SysTime));
 }
+
+struct CombineReprHandler(RHS...)
+    if (allSatisfy!(isReprHandler, RHS))
+{
+    enum sbinReprHandler;
+
+    static foreach (RH; RHS)
+    {
+        alias repr = RH.repr;
+        alias fromRepr = RH.fromRepr;
+    }
+}
+
+@safe unittest
+{
+    import std : SysTime, Duration, dur;
+
+    static struct SysTimeAsLongRH
+    {
+        enum sbinReprHandler;
+    static:
+        struct R { long value; }
+        R repr(in SysTime v) { return R(v.stdTime); }
+        SysTime fromRepr(in R r) { return SysTime(r.value); }
+    }
+
+    static struct DurationAsLongRH
+    {
+        enum sbinReprHandler;
+    static:
+        struct R { long value; }
+        R repr(in Duration v) { return R(v.total!"hnsecs"); }
+        Duration fromRepr(in R r) { return dur!"hnsecs"(r.value); }
+    }
+
+    alias RH = CombineReprHandler!(SysTimeAsLongRH, DurationAsLongRH);
+
+    static assert (isReprHandler!RH);
+
+    static assert (hasSerializeRepr!(RH, SysTime));
+    static assert (hasDeserializeRepr!(RH, SysTime, SysTimeAsLongRH.R));
+    static assert (is(serializeRepr!(RH, SysTime) == SysTimeAsLongRH.R));
+    static assert (hasRepr!(RH, SysTime));
+
+    static assert (hasSerializeRepr!(RH, Duration));
+    static assert (hasDeserializeRepr!(RH, Duration, DurationAsLongRH.R));
+    static assert (is(serializeRepr!(RH, Duration) == DurationAsLongRH.R));
+    static assert (hasRepr!(RH, Duration));
+}
+

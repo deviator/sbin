@@ -1018,4 +1018,92 @@ static if (__VERSION__ >= 2097)
         auto val2 = sbinDeserialize!UT3(data);
         assert (val1 == val2);
     }
+
+    import std : Nullable;
+
+    static struct NullableAsSumTypeRH
+    {
+        enum sbinReprHandler;
+    static:
+        alias ST = std.sumtype.SumType;
+
+        auto repr(N)(in N n)
+            if (is(N == Nullable!X, X))
+        {
+            alias R = ST!(typeof(null), typeof(N.init.get));
+            return n.isNull ? R(null) : R(n.get);
+        }
+
+        auto fromRepr(N)(in N n)
+            if (is(N == ST!X, X...) && X.length == 2 && is(X[0] == typeof(null)))
+        {
+            alias X = N.Types;
+            alias R = Nullable!(X[1]);
+            return n.match!(
+                (typeof(null) v) => R.init,
+                v => R(v)
+            );
+        }
+    }
+
+    unittest
+    {
+        alias NB = Nullable!ubyte;
+
+        alias SNB = std.sumtype.SumType!(typeof(null), ubyte);
+
+        const val1 = [ NB.init, NB(11), NB(12), NB.init, NB(13) ];
+
+        alias RH = NullableAsSumTypeRH;
+
+        assert (RH.repr(NB.init) == SNB(null));
+        assert (RH.repr(NB(12)) == SNB(12));
+        assert (RH.fromRepr(SNB(null)) == NB.init);
+        assert (RH.fromRepr(SNB(21)) == NB(21));
+
+        import sbin.repr;
+
+        static assert (hasSerializeRepr!(RH, NB));
+        static assert (hasDeserializeRepr!(RH, NB, SNB));
+        static assert (hasRepr!(RH, NB));
+
+        const data = sbinSerialize!RH(val1);
+
+        assert (data == [5, 0, 1,11, 1,12, 0, 1,13]);
+
+        const val2 = sbinDeserialize!(RH, NB[])(data);
+
+        assert (val1 == val2);
+    }
+
+    unittest
+    {
+        import std.datetime;
+
+        static struct SysTimeAsLongRH
+        {
+            enum sbinReprHandler;
+        static:
+            long repr(const SysTime t) { return t.toUTC.stdTime; }
+            SysTime fromRepr(long r) { return SysTime(r, UTC()); }
+        }
+
+        import sbin.repr;
+
+        alias RH = CombineReprHandler!(SysTimeAsLongRH, NullableAsSumTypeRH);
+
+        alias NB = Nullable!ubyte;
+
+        alias S = std.sumtype.SumType!(NB, SysTime);
+
+        const val1 = [ S(NB.init), S(NB(11)), S(NB.init), S(NB(33)), S(SysTime(0)) ];
+
+        const data = sbinSerialize!RH(val1);
+
+        assert (data == [5, 0,0, 0,1,11, 0,0, 0,1,33, 1,0,0,0,0,0,0,0,0]);
+
+        const val2 = sbinDeserialize!(RH, S[])(data);
+
+        assert (val1 == val2);
+    }
 }

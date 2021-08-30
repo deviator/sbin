@@ -212,6 +212,88 @@ auto foo2 = sbinDeserialize!(RH, Foo)(foo_bytes);
 assert (foo == foo2);
 ```
 
+You can combinate representation handlers in one struct:
+
+```d
+    import std.sumtype;
+    import std : Nullable, SysTime;
+
+    static struct NullableAsSumTypeRH
+    {
+        enum sbinReprHandler;
+    static:
+        alias ST = std.sumtype.SumType;
+
+        auto repr(N)(in N n)
+            if (is(N == Nullable!X, X))
+        {
+            alias R = ST!(typeof(null), typeof(N.init.get));
+            return n.isNull ? R(null) : R(n.get);
+        }
+
+        auto fromRepr(N)(in N n)
+            if (is(N == ST!X, X...) && X.length == 2 && is(X[0] == typeof(null)))
+        {
+            alias X = N.Types;
+            alias R = Nullable!(X[1]);
+            return n.match!(
+                (typeof(null) v) => R.init,
+                v => R(v)
+            );
+        }
+    }
+
+    static struct SysTimeAsLongRH
+    {
+        enum sbinReprHandler;
+    static:
+        long repr(const SysTime t) { return t.toUTC.stdTime; }
+        SysTime fromRepr(long r) { return SysTime(r, UTC()); }
+    }
+
+    import sbin.repr;
+
+    alias RH = CombineReprHandler!(SysTimeAsLongRH, NullableAsSumTypeRH);
+
+    /+ same as
+    static struct RH
+    {
+        enum sbinReprHandler;
+
+        alias repr = SysTimeAsLongRH.repr;
+        alias fromRepr = SysTimeAsLongRH.fromRepr;
+
+        alias repr = NullableAsSumTypeRH.repr;
+        alias fromRepr = NullableAsSumTypeRH.fromRepr;
+    }
+    +/
+
+    alias NB = Nullable!ubyte;
+    alias S = std.sumtype.SumType!(NB, SysTime);
+    const val1 = [ S(NB.init), S(NB(11)), S(NB.init), S(NB(33)), S(SysTime(0)) ];
+    const data = sbinSerialize!RH(val1);
+    assert (data == [5, 0,0, 0,1,11, 0,0, 0,1,33, 1,0,0,0,0,0,0,0,0]);
+    const val2 = sbinDeserialize!(RH, S[])(data);
+    assert (val1 == val2)
+```
+
+To avoid collisions recomends use type wrappers because of rulles of functions overloads:
+
+```d
+    static struct RH
+    {
+        enum sbinReprHandler;
+    static:
+        static struct SBinSysTime { long value; }
+        SBinSysTime repr(const SysTime t) { return SBinSysTime(t.toUTC.stdTime); }
+        SysTime fromRepr(SBinSysTime r) { return SysTime(r.value, UTC()); }
+
+        static struct SBinFoo { long value; }
+        SBinFoo repr(const Foo f) { return SBinFoo(f.getValue); }
+        Foo fromRepr(SBinFoo f) { return Foo(f.value); }
+    }
+```
+
 ## Limitations
 
 ### Unions
