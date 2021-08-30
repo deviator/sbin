@@ -1002,7 +1002,7 @@ static if (__VERSION__ >= 2097)
         assert (val1 == val2);
     }
 
-    alias UT3 = SumType!(typeof(null), byte, This[]);
+    alias UT3 = SumType!(typeof(null), byte, std.sumtype.This[]);
 
     unittest
     {
