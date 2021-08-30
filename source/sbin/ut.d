@@ -952,7 +952,7 @@ static if (__VERSION__ >= 2097)
 {
     import std.sumtype;
 
-    alias UT1 = SumType!(string, int);
+    alias UT1 = std.sumtype.SumType!(string, int);
 
     //@safe // sumtype opAssign not safe
     unittest
@@ -991,7 +991,7 @@ static if (__VERSION__ >= 2097)
         assert (val2.match!(v => is(typeof(v) == int)));
     }
 
-    alias UT2 = SumType!(typeof(null), byte, byte[3]);
+    alias UT2 = std.sumtype.SumType!(typeof(null), byte, byte[3]);
 
     unittest
     {
@@ -1002,7 +1002,7 @@ static if (__VERSION__ >= 2097)
         assert (val1 == val2);
     }
 
-    alias UT3 = SumType!(typeof(null), byte, std.sumtype.This[]);
+    alias UT3 = std.sumtype.SumType!(typeof(null), byte, std.sumtype.This[]);
 
     unittest
     {
