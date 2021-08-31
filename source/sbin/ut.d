@@ -6,6 +6,7 @@ import sbin.type;
 import sbin.exception;
 import sbin.serialize;
 import sbin.deserialize;
+import sbin.stdtypesrh;
 
 /*  A note about `stable_format` arrays below.
 
@@ -908,17 +909,7 @@ unittest
 
     import std.datetime;
 
-    static struct RH
-    {
-        enum sbinReprHandler;
-    static:
-        static struct BAW3 { vluint bc; void[] data; }
-        BAW3 repr(const BitArray ba) { return BAW3(vluint(ba.length), cast(void[])ba.dup); }
-        BitArray fromRepr(BAW3 w) { return BitArray(w.data.dup, w.bc); }
-
-        long repr(const SysTime t) { return t.toUTC.stdTime; }
-        SysTime fromRepr(long r) { return SysTime(r, UTC()); }
-    }
+    alias RH = CombineReprHandler!(BitArrayRH, SysTimeAsHNSecsRH!true);
 
     assert (sbinSerialize!RH(b) == stable_format);
     auto t3 = sbinDeserialize!(RH, BitArray)(stable_format);
@@ -1021,31 +1012,6 @@ static if (__VERSION__ >= 2097)
 
     import std : Nullable;
 
-    static struct NullableAsSumTypeRH
-    {
-        enum sbinReprHandler;
-    static:
-        alias ST = std.sumtype.SumType;
-
-        auto repr(N)(in N n)
-            if (is(N == Nullable!X, X))
-        {
-            alias R = ST!(typeof(null), typeof(N.init.get));
-            return n.isNull ? R(null) : R(n.get);
-        }
-
-        auto fromRepr(N)(in N n)
-            if (is(N == ST!X, X...) && X.length == 2 && is(X[0] == typeof(null)))
-        {
-            alias X = N.Types;
-            alias R = Nullable!(X[1]);
-            return n.match!(
-                (typeof(null) v) => R.init,
-                v => R(v)
-            );
-        }
-    }
-
     unittest
     {
         alias NB = Nullable!ubyte;
@@ -1080,17 +1046,7 @@ static if (__VERSION__ >= 2097)
     {
         import std.datetime;
 
-        static struct SysTimeAsLongRH
-        {
-            enum sbinReprHandler;
-        static:
-            long repr(const SysTime t) { return t.toUTC.stdTime; }
-            SysTime fromRepr(long r) { return SysTime(r, UTC()); }
-        }
-
-        import sbin.repr;
-
-        alias RH = CombineReprHandler!(SysTimeAsLongRH, NullableAsSumTypeRH);
+        alias RH = CombineReprHandler!(SysTimeAsHNSecsRH!false, NullableAsSumTypeRH);
 
         alias NB = Nullable!ubyte;
 

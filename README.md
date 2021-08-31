@@ -294,6 +294,8 @@ To avoid collisions recomends use type wrappers because of rulles of functions o
     }
 ```
 
+See `sbin.stdtypesrh` for some basic handlers.
+
 ## Limitations
 
 ### Unions

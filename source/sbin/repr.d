@@ -118,4 +118,3 @@ struct CombineReprHandler(RHS...)
     static assert (is(serializeRepr!(RH, Duration) == DurationAsLongRH.R));
     static assert (hasRepr!(RH, Duration));
 }
-
