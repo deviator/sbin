@@ -61,7 +61,7 @@ static:
 
     R repr(in BitArray v) { return R(vluint(v.length), cast(const(void)[])v); }
 
-    BitArray fromRepr(in R r) { return BitArray(r.data.dup, r.bits); }
+    BitArray fromRepr(in R r) { return BitArray(r.data.dup, cast(size_t)r.bits.value); }
 }
 
 static if (__VERSION__ >= 2097)
