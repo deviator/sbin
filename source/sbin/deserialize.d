@@ -15,8 +15,8 @@ import sbin.repr;
         range = input range with serialized data (not saved before work)
         target = reference to result object
  +/
-void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Target target)
-    if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte) && isReprHandler!RH)
+void sbinDeserializePart(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Target...)
+    (ref R range, ref Target target) if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte) && isReprHandler!RH)
 {
     import sbin.util.stack : Stack;
 
@@ -226,6 +226,14 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
         }
         else static if (is(T == struct))
         {
+            version (allowRawUnions)
+            {
+                import std : Nullable;
+                static if (is(T == Nullable!A, A))
+                    pragma(msg, file, "(", cast(int)line, "): ", "\033[33mWarning:\033[0m ",
+                        T, " deserialize as union, use NullableAsSumTypeRH for proper deserialize!");
+            }
+
             import std.traits : hasUDA;
             foreach (i, ref v; trg.tupleof)
                 static if (!hasUDA!(T.tupleof[i], sbinSkip))
@@ -233,9 +241,15 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
         }
         else static if (is(T == union))
         {
-            auto tmp = (() @trusted => cast(ubyte[])((cast(void*)&trg)[0..T.sizeof]))();
-            foreach (i, ref v; tmp)
-                v = pop(r, "byte", i, T.stringof, i, T.sizeof);
+            version (allowRawUnions)
+            {
+                auto tmp = (() @trusted => cast(ubyte[])((cast(void*)&trg)[0..T.sizeof]))();
+                foreach (i, ref v; tmp)
+                    v = pop(r, "byte", i, T.stringof, i, T.sizeof);
+            }
+            else
+                static assert(0, "raw unions are not allowed, for allow build "~
+                                    "with configuration 'allow-raw-unions'");
         }
         else static assert(0, "unsupported type: " ~ T.stringof);
     }
@@ -258,19 +272,19 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, Target...)(ref R range, ref Tar
     Returns:
         deserialized value
  +/
-Target sbinDeserializePart(RH=EmptyReprHandler, Target, R)(ref R range)
-    if (isReprHandler!RH)
+Target sbinDeserializePart(RH=EmptyReprHandler, Target, R, string file=__FILE__, size_t line=__LINE__)
+    (ref R range) if (isReprHandler!RH)
 {
     Unqual!Target ret;
-    sbinDeserializePart!RH(range, ret);
+    sbinDeserializePart!(RH, R, file, line, Target)(range, ret);
     return ret;
 }
 
 /// ditto
-Target sbinDeserializePart(Target, R)(ref R range)
+Target sbinDeserializePart(Target, R, string file=__FILE__, size_t line=__LINE__)(ref R range)
 {
     Unqual!Target ret;
-    sbinDeserializePart!EmptyReprHandler(range, ret);
+    sbinDeserializePart!(EmptyReprHandler, R, file, line, Target)(range, ret);
     return ret;
 }
 
@@ -282,19 +296,19 @@ Target sbinDeserializePart(Target, R)(ref R range)
     Returns:
         deserialized value
  +/
-Target sbinDeserialize(RH=EmptyReprHandler, Target, R)(R range)
-    if (isReprHandler!RH)
+Target sbinDeserialize(RH=EmptyReprHandler, Target, R, string file=__FILE__, size_t line=__LINE__)
+    (R range) if (isReprHandler!RH)
 {
     Unqual!Target ret;
-    sbinDeserialize!RH(range, ret);
+    sbinDeserialize!(RH)(range, ret);
     return ret;
 }
 
 /// ditto
-Target sbinDeserialize(Target, R)(R range)
+Target sbinDeserialize(Target, R, string file=__FILE__, size_t line=__LINE__)(R range)
 {
     Unqual!Target ret;
-    sbinDeserialize!EmptyReprHandler(range, ret);
+    sbinDeserialize!(EmptyReprHandler, R, file, line)(range, ret);
     return ret;
 }
 
@@ -307,10 +321,10 @@ Target sbinDeserialize(Target, R)(R range)
     Throws:
         SBinDeserializeException if range isn't empty after deseriazlie
  +/
-void sbinDeserialize(RH=EmptyReprHandler, R, Target...)(R range, ref Target target)
-    if (isReprHandler!RH)
+void sbinDeserialize(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Target...)
+    (R range, ref Target target) if (isReprHandler!RH)
 {
-    sbinDeserializePart!RH(range, target);
+    sbinDeserializePart!(RH, R, file, line)(range, target);
 
     enforce(range.empty, new SBinDeserializeException(
         format("input range not empty after full '%s' deserialize", Target.stringof)));

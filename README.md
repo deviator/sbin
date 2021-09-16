@@ -13,19 +13,41 @@ You can serialize/deserialize numbers, arrays, enums, structs and combinations o
 
 ### Functions
 
-#### `void sbinSerialize(R, Ts...)(ref R r, auto ref const Ts vals) if (isOutputRange!(R, ubyte) && Ts.length)`
+#### `sbinSerialize`
+
+```d
+void sbinSerialize(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Ts...)
+    (auto ref R r, auto ref const Ts vals) if (isOutputRange!(R, ubyte) && Ts.length && isReprHandler!RH);
+```
 
 Call `put(r, <data>)` for all fields in vals recursively.
 
-Do not allocate memory if you use range with `@nogc` `put`.
+Do not allocate memory if used range with `@nogc` `put`.
 
-#### `ubyte[] sbinSerialize(T)(auto ref const T val)`
+```d
+ubyte[] sbinSerialize(RH=EmptyReprHandler, T, string file=__FILE__, size_t line=__LINE__)
+    (auto ref const T val) if (isReprHandler!RH)
+```
 
 Uses inner `appender!(ubyte[])`.
 
-#### `void sbinDeserialize(R, Target...)(R range, ref Target target) if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte))`
+#### `sbinDeserialize`
+
+```d
+void sbinDeserialize(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Target...)
+    (R range, ref Target target) if (isReprHandler!RH);
+```
 
 Fills `target` from `range` bytes
+
+```d
+Target sbinDeserialize(Target, R, string file=__FILE__, size_t line=__LINE__)(R range);
+
+Target sbinDeserialize(RH=EmptyReprHandler, Target, R, string file=__FILE__, size_t line=__LINE__)
+    (R range) if (isReprHandler!RH);
+```
+
+Creates `Unqual!Target ret`, fill it and return.
 
 Can throw:
 
@@ -40,14 +62,29 @@ Allocate memory if deserialize:
 * associative arrays
 * dynamic array if target length is not equal length from input bytes
 
-#### `Target sbinDeserialize(Target, R)(R range)`
 
-Creates `Unqual!Target ret`, fill it and return.
+#### `sbinDeserializePart`
+
+```d
+void sbinDeserializePart(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Target...)
+    (ref R range, ref Target target) if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte) && isReprHandler!RH);
+
+Target sbinDeserializePart(RH=EmptyReprHandler, Target, R, string file=__FILE__, size_t line=__LINE__)
+    (ref R range) if (isReprHandler!RH);
+
+Target sbinDeserializePart(Target, R, string file=__FILE__, size_t line=__LINE__)(ref R range);
+```
+
+Can throw:
+
+* `SBinDeserializeEmptyRangeException` then try read empty range
+
 
 ### Key points
 
 * dynamic arrays (associative arrays too) and algebraic types (serialized only
 current value, not full storage) has variable length, all other types has fixed size
+* raw unions are not allowed by default, for allowing use config `allow-raw-unions`
 
 ### Example
 
@@ -298,7 +335,7 @@ See `sbin.stdtypesrh` for some basic handlers.
 
 ## Limitations
 
-### Unions
+### Unions (if used config `allow-raw-unions`)
 
 Unions serializes/deserializes as static byte array without analyze elements
 (size of union is size of max element).

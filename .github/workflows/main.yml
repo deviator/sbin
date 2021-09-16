@@ -36,6 +36,7 @@ jobs:
       - name: Run tests
         run: |
           dub test
+          dub test --config=allow-raw-unions
           dub --root=example --single mir_algebraic_example.d
           dub --root=example --single taggedalgebraic_example.d
           dub --root=example --single sumtype_example.d

@@ -14,17 +14,14 @@ import sbin.repr;
         val - serializible value
         r - output range
 +/
-void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const Ts vals)
-    if (isOutputRange!(R, ubyte) && Ts.length && isReprHandler!RH)
+void sbinSerialize(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Ts...)
+    (auto ref R r, auto ref const Ts vals) if (isOutputRange!(R, ubyte) && Ts.length && isReprHandler!RH)
 {
-    static if (Ts.length == 1)
+    void impl(T)(auto ref R r, auto ref const T val)
     {
-        alias T = Unqual!(Ts[0]);
-        alias val = vals[0];
-
         static if (hasRepr!(RH, T))
         {
-            sbinSerialize!RH(r, RH.repr(val));
+            impl(r, RH.repr(val));
         }
         else static if (is(T == enum))
         {
@@ -51,7 +48,7 @@ void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const T
         else static if (isStaticArray!T)
         {
             foreach (ref v; val)
-                sbinSerialize!RH(r, v);
+                impl(r, v);
         }
         else static if (isSomeString!T)
         {
@@ -62,46 +59,60 @@ void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const T
         {
             dumpVLUInt(r, val.length);
             foreach (ref v; val)
-                sbinSerialize!RH(r, v);
+                impl(r, v);
         }
         else static if (isAssociativeArray!T)
         {
             dumpVLUInt(r, val.length);
             foreach (k, ref v; val)
             {
-                sbinSerialize!RH(r, k);
-                sbinSerialize!RH(r, v);
+                impl(r, k);
+                impl(r, v);
             }
         }
         else static if (isTagged!(T).any)
         {
-            sbinSerialize!RH(r, getTaggedTag(val));
+            impl(r, getTaggedTag(val));
             val.taggedMatch!(
                 (v) {
                     static if (!is(Unqual!(typeof(v)) == typeof(null)))
-                        sbinSerialize!RH(r, v);
+                        impl(r, v);
                 }
             );
         }
         else static if (hasCustomRepr!(T, RH))
         {
             // for @safe sbinSerialize sbinCustomRepr must be @trusted or @safe
-            sbinSerialize!RH(r, val.sbinCustomRepr());
+            impl(r, val.sbinCustomRepr());
         }
         else static if (is(T == struct))
         {
+            version (allowRawUnions)
+            {
+                import std : Nullable;
+                static if (is(T == Nullable!A, A))
+                    pragma(msg, file, "(", cast(int)line, "): ", "\033[33mWarning:\033[0m ",
+                        T, " serialize as union, use NullableAsSumTypeRH for proper serialize!");
+            }
+
             import std.traits : hasUDA;
             foreach (i, ref v; val.tupleof)
                 static if (!hasUDA!(T.tupleof[i], sbinSkip))
-                    sbinSerialize!RH(r, v);
+                    impl(r, v);
         }
         else static if (is(T == union))
         {
-            sbinSerialize!RH(r, (() @trusted => cast(void[T.sizeof])((cast(void*)&val)[0..T.sizeof]))());
+            version (allowRawUnions)
+                impl(r, (() @trusted => cast(void[T.sizeof])((cast(void*)&val)[0..T.sizeof]))());
+            else
+                static assert(0, "raw unions are not allowed, for allow build "~
+                                    "with configuration 'allow-raw-unions'");
         }
         else static assert(0, "unsupported type: " ~ T.stringof);
     }
-    else foreach (ref v; vals) sbinSerialize!RH(r, v);
+
+    static if (vals.length == 1) impl(r, vals[0]);
+    else foreach (ref v; vals) impl(r, v);
 }
 
 /++ Serialize to ubyte[]
@@ -114,9 +125,10 @@ void sbinSerialize(RH=EmptyReprHandler, R, Ts...)(auto ref R r, auto ref const T
     Returns:
         serialized data
 +/
-ubyte[] sbinSerialize(RH=EmptyReprHandler, T)(auto ref const T val) if (isReprHandler!RH)
+ubyte[] sbinSerialize(RH=EmptyReprHandler, T, string file=__FILE__, size_t line=__LINE__)
+    (auto ref const T val) if (isReprHandler!RH)
 {
     auto buf = appender!(ubyte[]);
-    sbinSerialize!RH(buf, val);
+    sbinSerialize!(RH, typeof(buf), file, line)(buf, val);
     return buf.data;
 }

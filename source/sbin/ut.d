@@ -632,26 +632,29 @@ unittest
     static assert (!__traits(compiles, foo.sbinSerialize.sbinDeserialize!Foo));
 }
 
-@safe unittest
+version (allowRawUnions)
 {
-    import std.algorithm : max;
-
-    union Union
+    @safe unittest
     {
-        float fval;
-        byte ival;
+        import std.algorithm : max;
+
+        union Union
+        {
+            float fval;
+            byte ival;
+        }
+
+        static assert (Union.init.sizeof == max(float.sizeof, byte.sizeof));
+
+        Union u;
+        u.ival = 114;
+        assert (u.ival == 114);
+
+        immutable ubyte[] stable_format = [114, 0, 192, 127];
+        assert (u.sbinSerialize == stable_format);
+        const su = stable_format.sbinDeserialize!Union;
+        assert (su.ival == 114);
     }
-
-    static assert (Union.init.sizeof == max(float.sizeof, byte.sizeof));
-
-    Union u;
-    u.ival = 114;
-    assert (u.ival == 114);
-
-    immutable ubyte[] stable_format = [114, 0, 192, 127];
-    assert (u.sbinSerialize == stable_format);
-    const su = stable_format.sbinDeserialize!Union;
-    assert (su.ival == 114);
 }
 
 unittest
@@ -1039,6 +1042,59 @@ static if (__VERSION__ >= 2097)
 
         const val2 = sbinDeserialize!(RH, NB[])(data);
 
+        assert (val1 == val2);
+    }
+
+    unittest
+    {
+        static struct F1 { ubyte value; }
+        static struct F2 { ubyte value; }
+        static struct Foo
+        {
+            static struct Bar(T)
+            {
+                string name;
+                Nullable!T value;
+            }
+
+            alias BF1 = Bar!F1;
+            alias BF2 = Bar!F2;
+
+            BF1[] f1s;
+            BF2[] f2s;
+        }
+
+        alias RH = NullableAsSumTypeRH;
+
+        const val1 = Foo(
+            [
+                Foo.BF1("ok", Nullable!F1(F1(12))),
+                Foo.BF1("da", Nullable!F1(F1(32))),
+                Foo.BF1("ne", Nullable!(F1).init),
+            ],
+            [
+                Foo.BF2("o", Nullable!F2(F2(5))),
+                Foo.BF2("t", Nullable!(F2).init),
+                Foo.BF2("o", Nullable!F2(F2(7))),
+            ]
+        );
+
+        const data = sbinSerialize!RH(val1);
+        //const data = sbinSerialize(val1);
+
+        assert (data == [
+            3,
+                2, 111, 107,    1, 12,
+                2, 100,  97,    1, 32,
+                2, 110, 101,    0,
+            3,
+                1, 111,         1, 5,
+                1, 116,         0,
+                1, 111,         1, 7
+        ]);
+
+        const val2 = sbinDeserialize!(RH, Foo)(data);
+        //const val2 = sbinDeserialize!Foo(data);
         assert (val1 == val2);
     }
 
