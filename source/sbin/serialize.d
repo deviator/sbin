@@ -11,8 +11,8 @@ import sbin.repr;
 /++ Serialize to output ubyte range
 
     Params:
-        val - serializible value
-        r - output range
+        vals = serializible values
+        r = output range
 +/
 void sbinSerialize(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Ts...)
     (auto ref R r, auto ref const Ts vals) if (isOutputRange!(R, ubyte) && Ts.length && isReprHandler!RH)
