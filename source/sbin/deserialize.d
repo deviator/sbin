@@ -16,7 +16,7 @@ import sbin.repr;
         target = reference to result object
  +/
 void sbinDeserializePart(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Target...)
-    (ref R range, ref Target target) if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte) && isReprHandler!RH)
+    (scope ref R range, ref Target target) if (isInputRange!R && is(Unqual!(ElementType!R) == ubyte) && isReprHandler!RH)
 {
     import sbin.util.stack : Stack;
 
@@ -273,7 +273,7 @@ void sbinDeserializePart(RH=EmptyReprHandler, R, string file=__FILE__, size_t li
         deserialized value
  +/
 Target sbinDeserializePart(RH=EmptyReprHandler, Target, R, string file=__FILE__, size_t line=__LINE__)
-    (ref R range) if (isReprHandler!RH)
+    (scope ref R range) if (isReprHandler!RH)
 {
     Unqual!Target ret;
     sbinDeserializePart!(RH, R, file, line, Target)(range, ret);
@@ -281,7 +281,7 @@ Target sbinDeserializePart(RH=EmptyReprHandler, Target, R, string file=__FILE__,
 }
 
 /// ditto
-Target sbinDeserializePart(Target, R, string file=__FILE__, size_t line=__LINE__)(ref R range)
+Target sbinDeserializePart(Target, R, string file=__FILE__, size_t line=__LINE__)(scope ref R range)
 {
     Unqual!Target ret;
     sbinDeserializePart!(EmptyReprHandler, R, file, line, Target)(range, ret);
@@ -297,7 +297,7 @@ Target sbinDeserializePart(Target, R, string file=__FILE__, size_t line=__LINE__
         deserialized value
  +/
 Target sbinDeserialize(RH=EmptyReprHandler, Target, R, string file=__FILE__, size_t line=__LINE__)
-    (R range) if (isReprHandler!RH)
+    (scope R range) if (isReprHandler!RH)
 {
     Unqual!Target ret;
     sbinDeserialize!(RH)(range, ret);
@@ -305,7 +305,7 @@ Target sbinDeserialize(RH=EmptyReprHandler, Target, R, string file=__FILE__, siz
 }
 
 /// ditto
-Target sbinDeserialize(Target, R, string file=__FILE__, size_t line=__LINE__)(R range)
+Target sbinDeserialize(Target, R, string file=__FILE__, size_t line=__LINE__)(scope R range)
 {
     Unqual!Target ret;
     sbinDeserialize!(EmptyReprHandler, R, file, line)(range, ret);
@@ -322,7 +322,7 @@ Target sbinDeserialize(Target, R, string file=__FILE__, size_t line=__LINE__)(R 
         SBinDeserializeException if range isn't empty after deseriazlie
  +/
 void sbinDeserialize(RH=EmptyReprHandler, R, string file=__FILE__, size_t line=__LINE__, Target...)
-    (R range, ref Target target) if (isReprHandler!RH)
+    (scope R range, ref Target target) if (isReprHandler!RH)
 {
     sbinDeserializePart!(RH, R, file, line)(range, target);
 

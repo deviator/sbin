@@ -21,6 +21,10 @@ jobs:
           - ldc-1.28.1
           - ldc-1.32.1
           - ldc-1.36.0
+        exclude:
+          # linker error "section __DATA/__thread_bss has type zero-fill but non-zero file offset"
+          - os: macOS-latest
+            dc: dmd-2.098.1
 
     runs-on: ${{ matrix.os }}
     steps:

@@ -13,6 +13,11 @@ dependency "sumtype" version="~>1.1" optional=true
 configuration "default" {
 }
 
+configuration "unittest" {
+    dflags `-allinst`
+}
+
 configuration "allow-raw-unions" {
     versions "allowRawUnions"
+    dflags `-allinst`
 }
