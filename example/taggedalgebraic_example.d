@@ -1,5 +1,5 @@
 /+ dub.sdl:
-    dependency "taggedalgebraic" version="~>0.11.18"
+    dependency "taggedalgebraic" version="~>0.11"
     dependency "sbin" path=".."
 +/
 

@@ -1,7 +1,7 @@
 /+ dub.sdl:
-    dependency "mir-core" version="~>1.1.54"
-    dependency "sumtype" version="~>1.1.0"
-    dependency "taggedalgebraic" version="~>0.11.18"
+    dependency "mir-core" version="~>1.1"
+    dependency "sumtype" version="~>1.1"
+    dependency "taggedalgebraic" version="~>0.11"
     dependency "sbin" path=".."
 +/
 
@@ -13,12 +13,14 @@ import sbin;
 
 struct Foo { string name; }
 
-alias MA = Algebraic!(
-    TaggedType!(typeof(null), "nil"),
-    TaggedType!(int, "count"),
-    TaggedType!(string, "str"),
-    TaggedType!(Foo, "foo"),
-);
+static union U
+{
+    typeof(null) nil;
+    int count;
+    string str;
+    Foo foo;
+}
+alias MA = Algebraic!U;
 
 static assert (isTagged!(MA).any);
 static assert (isTagged!(MA).isMirAlgebraic);

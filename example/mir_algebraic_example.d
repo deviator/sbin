@@ -1,5 +1,5 @@
 /+ dub.sdl:
-    dependency "mir-core" version="~>1.1.54"
+    dependency "mir-core" version="~>1.1"
     dependency "sbin" path=".."
 +/
 
@@ -8,12 +8,14 @@ import sbin;
 
 struct Foo { string name; }
 
-alias TUnion = Algebraic!(
-    TaggedType!(typeof(null), "nil"),
-    TaggedType!(int, "count"),
-    TaggedType!(string, "str"),
-    TaggedType!(Foo, "foo"),
-);
+static union U
+{
+    typeof(null) nil;
+    int count;
+    string str;
+    Foo foo;
+}
+alias TUnion = Algebraic!U;
 
 static assert (isTagged!(TUnion).any);
 static assert (isTagged!(TUnion).isMirAlgebraic);
@@ -42,7 +44,7 @@ void barTest()
     assert (sdbar.data.length == 4);
     assert (sdbar.data[0].kind == TUnion.Kind.count);
     assert (sdbar.data[0].get!int == 42);
-    //assert (sdbar.data[0].count == 42);
+    assert (sdbar.data[0].count == 42);
 
     // deserialize to new memory
     assert (bar.data[1].get!string.ptr !=
@@ -50,11 +52,11 @@ void barTest()
 
     assert (sdbar.data[1].kind == TUnion.Kind.str);
     assert (sdbar.data[1].get!string == "Hello");
-    //assert (sdbar.data[1].str == "Hello");
+    assert (sdbar.data[1].str == "Hello");
 
     assert (sdbar.data[2].kind == TUnion.Kind.foo);
     assert (sdbar.data[2].get!Foo == Foo("ABC"));
-    //assert (sdbar.data[2].foo == Foo("ABC"));
+    assert (sdbar.data[2].foo == Foo("ABC"));
     assert (sdbar.data[2].get!Foo.name.ptr !=
               bar.data[2].get!Foo.name.ptr);
 
