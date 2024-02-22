@@ -1,5 +1,5 @@
 /+ dub.sdl:
-    dependency "sumtype" version="~>1.1.0"
+    dependency "sumtype" version="~>1.1"
     dependency "sbin" path=".."
 +/
 
